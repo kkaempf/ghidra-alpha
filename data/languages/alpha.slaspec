@@ -29,6 +29,9 @@ define register offset=0x100 size=8 [ F0  F1  F2  F3  F4  F5  F6  F7  F8  F9  F1
 # program counter
 define register offset=0x200 size=8 [ PC ];
 
+# variables
+define register offset=0x208 size=8 [ loc ];
+
 #--------------------------------------------------------------------------
 # Tokens
 
@@ -49,8 +52,15 @@ define register offset=0x200 size=8 [ PC ];
 define token memory (32)
         opcode    = (26, 31)
         ra        = (21, 25) # Register a
+        bdisp     = ( 0, 20) # branch displacement
         rb        = (16, 20) # Register b
+        function  = ( 0, 15) # memory format with function code
         mdisp     = ( 0, 15) dec # memory displacement
+        jop       = (14, 15) # jump opcode
+        jdisp     = ( 0, 13) # jump displacement
+        sbz       = (13, 15) # should be zero
+        lit       = (13, 20) # literal
+        bit12     = (12, 12) # bit 12: 0->SBZ, 1->LIT
 ;
 
 # Operate format
@@ -75,9 +85,15 @@ attach variables [ rb ] [ R0  R1  R2  R3  R4  R5  R6  R7  R8  R9  R10 R11 R12 R1
 # LDAx
 
 #  LDA Ra, disp(Rb)
-disp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:4); export ptr; }
+disp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:2); export ptr; }
 #  LDAH Ra, 32767(Rb)
-hdisp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:4)*65536; export ptr; }
+hdisp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:2)*65536; export ptr; }
+
+# PC relative displacement
+disp_al: loc is bdisp [ loc = inst_start + 4; ] { ptr:8 = loc:8 + sext(bdisp:3)*4; export *[ram]:8 ptr; }
+
+# jump hint
+hint: jdisp is jdisp { ptr:8 = sext(jdisp:2)*4; export *[ram]:8 ptr; }
 
 #--------------------------------------------------------------------------
 # Mnemonics
@@ -117,3 +133,26 @@ hdisp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:4)*65536; export p
 # store to unaligned
 :STQ_U  ra, disp_regb is opcode=0x0f & ra & disp_regb { ptr = disp_regb & ~7; *ptr = ra; }
 
+#=========================================================================
+# Control Instructions
+#=========================================================================
+
+# PC-relative branch
+:BR   disp_al is opcode=0x30 & disp_al { goto [disp_al]; }
+:BSR  disp_al is opcode=0x34 & disp_al { goto [disp_al]; }
+
+# PC-relative branch conditional
+:BEQ  disp_al is opcode=0x39 & disp_al { goto [disp_al]; }
+:BGE  disp_al is opcode=0x3e & disp_al { goto [disp_al]; }
+:BGT  disp_al is opcode=0x3f & disp_al { goto [disp_al]; }
+:BLBC disp_al is opcode=0x38 & disp_al { goto [disp_al]; }
+:BLBS disp_al is opcode=0x3c & disp_al { goto [disp_al]; }
+:BLE  disp_al is opcode=0x3b & disp_al { goto [disp_al]; }
+:BLT  disp_al is opcode=0x3a & disp_al { goto [disp_al]; }
+:BNE  disp_al is opcode=0x3d & disp_al { goto [disp_al]; }
+
+# jumps
+:JMP ra,(rb),hint is opcode=0x1a & jop = 0 & ra & rb & hint { ptr:8 = rb & ~3; goto [ptr]; }
+:JSR ra,(rb),hint is opcode=0x1a & jop = 1 & ra & rb & hint { ptr:8 = rb & ~3; goto [ptr]; }
+:RET ra,(rb),hint is opcode=0x1a & jop = 2 & ra & rb & hint { ptr:8 = rb & ~3; goto [ptr]; }
+:JSR_COROUTINE ra,(rb),hint is opcode=0x1a & jop = 3 & ra & rb & hint { ptr:8 = rb & ~3; goto [ptr]; }
