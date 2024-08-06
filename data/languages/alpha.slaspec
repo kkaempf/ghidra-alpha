@@ -11,7 +11,7 @@
 
 define endian=little;
 define alignment=1;
-define space ram      type=ram_space      size=4  wordsize=1 default;
+define space ram      type=ram_space      size=8  wordsize=1 default;
 define space register type=register_space size=8;
 
 
@@ -75,7 +75,7 @@ attach variables [ rb ] [ R0  R1  R2  R3  R4  R5  R6  R7  R8  R9  R10 R11 R12 R1
 # LDAx
 
 #  LDA Ra, disp(Rb)
-ldisp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:4); export ptr; }
+disp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:4); export ptr; }
 #  LDAH Ra, 32767(Rb)
 hdisp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:4)*65536; export ptr; }
 
@@ -86,5 +86,34 @@ hdisp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:4)*65536; export p
 # Memory Integer Load/Store Instructions
 #=========================================================================
 
-:LDA ra, ldisp_regb is opcode=0x08 & ra & ldisp_regb { ra = ldisp_regb; }
+# load address
+:LDA  ra, disp_regb is opcode=0x08 & ra & disp_regb { ra = disp_regb; }
+# load address high
 :LDAH ra, hdisp_regb is opcode=0x09 & ra & hdisp_regb { ra = hdisp_regb; }
+
+# load zero-extended byte from memory
+:LDBU ra, disp_regb is opcode=0x0a & ra & disp_regb { ra = zext(*:1 disp_regb); }
+:LDL  ra, disp_regb is opcode=0x28 & ra & disp_regb { ra = sext(*:4 disp_regb); }
+:LDQ  ra, disp_regb is opcode=0x29 & ra & disp_regb { ra = *disp_regb; }
+:LDWU ra, disp_regb is opcode=0x0c & ra & disp_regb { ra = zext(*:2 disp_regb); }
+
+# load unaligned memory
+:LDQ_U ra, disp_regb is opcode=0x0b & ra & disp_regb { ptr = disp_regb & ~7; ra = *ptr; }
+
+# load memory locked
+:LDL_L  ra, disp_regb is opcode=0x2a & ra & disp_regb { ra = sext(*:4 disp_regb); }
+:LDQ_L  ra, disp_regb is opcode=0x2b & ra & disp_regb { ra = disp_regb; }
+
+# store to memory conditional
+:STL_C  ra, disp_regb is opcode=0x2e & ra & disp_regb { *:4 disp_regb = ra:4; }
+:STQ_C  ra, disp_regb is opcode=0x2f & ra & disp_regb { *disp_regb = ra; }
+
+# store to memory
+:STB  ra, disp_regb is opcode=0x0e & ra & disp_regb { *:1 disp_regb = ra:1; }
+:STL  ra, disp_regb is opcode=0x2c & ra & disp_regb { *:4 disp_regb = ra:4; }
+:STQ  ra, disp_regb is opcode=0x2d & ra & disp_regb { *disp_regb = ra; }
+:STW  ra, disp_regb is opcode=0x0d & ra & disp_regb { *:2 disp_regb = ra:2; }
+
+# store to unaligned
+:STQ_U  ra, disp_regb is opcode=0x0f & ra & disp_regb { ptr = disp_regb & ~7; *ptr = ra; }
+
