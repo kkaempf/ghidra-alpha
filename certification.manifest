@@ -1,0 +1,10 @@
+##VERSION: 2.0
+Module.manifest||LICENSE||||END|
+LICENSE||LICENSE||||END|
+Makefile||LICENSE||||END|
+README.md||LICENSE||||END|
+data/languages/alpha.cspec||LICENSE||||END|
+data/languages/alpha.ldefs||LICENSE||||END|
+data/languages/alpha.pspec||LICENSE||||END|
+data/languages/alpha.slaspec||LICENSE||||END|
+data/manuals/Alpha.idx||LICENSE||||END|

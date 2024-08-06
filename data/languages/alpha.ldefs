@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<language_definitions>
+  <language processor="Alpha"
+            endian="little"
+            size="64"
+            variant="21064"
+            version="1.0"
+            slafile="alpha.sla"
+            processorspec="alpha.pspec"
+            manualindexfile="../manuals/alpha.idx"
+            id="alpha:LE:64:default">
+    <description>DEC Alpha</description>
+    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <external_name tool="gnu" name="alpha"/>
+  </language>
+</language_definitions>

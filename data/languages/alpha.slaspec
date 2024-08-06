@@ -1,0 +1,90 @@
+# sleigh specification file for DEC Alpha
+#
+# Copyright (c) 2024 by Klaus Kämpf <kkaempf@gmail.com>
+#
+# Licensed under the Apache 2.0 license
+#
+
+
+#--------------------------------------------------------------------------
+# Spaces
+
+define endian=little;
+define alignment=1;
+define space ram      type=ram_space      size=4  wordsize=1 default;
+define space register type=register_space size=8;
+
+
+#--------------------------------------------------------------------------
+# Registers
+
+# integer registers
+define register offset=0x00 size=8 [ R0  R1  R2  R3  R4  R5  R6  R7  R8  R9  R10 R11 R12 R13 R14 R15
+                                     R16 R17 R18 R19 R20 R21 R22 R23 R24 R25 R26 R27 R28 R29 R30 zero];
+
+# floating point registers
+define register offset=0x100 size=8 [ F0  F1  F2  F3  F4  F5  F6  F7  F8  F9  F10 F11 F12 F13 F14 F15
+                                      F16 F17 F18 F19 F20 F21 F22 F23 F24 F25 F26 F27 F28 F29 F30 F31];
+
+# program counter
+define register offset=0x200 size=8 [ PC ];
+
+#--------------------------------------------------------------------------
+# Tokens
+
+# PALcode format
+#define token palcode (32)
+#        opcode    = (26, 31)
+#        number    = ( 0, 25) dec # PALcode function
+#;
+
+# Branch format
+#define token branch (32)
+#        opcode    = (26, 31)
+#        ra        = (21, 25) # Register a
+#        bdisp     = ( 0, 20) # branch displacement
+#;
+
+# Memory format
+define token memory (32)
+        opcode    = (26, 31)
+        ra        = (21, 25) # Register a
+        rb        = (16, 20) # Register b
+        mdisp     = ( 0, 15) dec # memory displacement
+;
+
+# Operate format
+#define token operate (32)
+#        function  = ( 5, 15) # memory instruction with function code
+#        rc        = ( 0,  4) # Register c
+#;
+
+#--------------------------------------------------------------------------
+# Variables
+
+attach variables [ ra ] [ R0  R1  R2  R3  R4  R5  R6  R7  R8  R9  R10 R11 R12 R13 R14 R15
+                          R16 R17 R18 R19 R20 R21 R22 R23 R24 R25 R26 R27 R28 R29 R30 zero];
+attach variables [ rb ] [ R0  R1  R2  R3  R4  R5  R6  R7  R8  R9  R10 R11 R12 R13 R14 R15
+                          R16 R17 R18 R19 R20 R21 R22 R23 R24 R25 R26 R27 R28 R29 R30 zero];
+#attach variables [ rc ] [ R0  R1  R2  R3  R4  R5  R6  R7  R8  R9  R10 R11 R12 R13 R14 R15
+#                          R16 R17 R18 R19 R20 R21 R22 R23 R24 R25 R26 R27 R28 R29 R30 zero];
+
+#--------------------------------------------------------------------------
+# Tables
+
+# LDAx
+
+#  LDA Ra, disp(Rb)
+ldisp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:4); export ptr; }
+#  LDAH Ra, 32767(Rb)
+hdisp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:4)*65536; export ptr; }
+
+#--------------------------------------------------------------------------
+# Mnemonics
+
+#=========================================================================
+# Memory Integer Load/Store Instructions
+#=========================================================================
+
+:LDA ra, ldisp_regb is opcode=0x08 & ra & ldisp_regb { ra = ldisp_regb; }
+:LDAH ra, hdisp_regb is opcode=0x09 & ra & hdisp_regb { ra = hdisp_regb; }
