@@ -26,11 +26,22 @@ define register offset=0x00 size=8 [ R0  R1  R2  R3  R4  R5  R6  R7  R8  R9  R10
 define register offset=0x100 size=8 [ F0  F1  F2  F3  F4  F5  F6  F7  F8  F9  F10 F11 F12 F13 F14 F15
                                       F16 F17 F18 F19 F20 F21 F22 F23 F24 F25 F26 F27 F28 F29 F30 F31];
 
+# flags: negative, overflow, zero
+define register offset=0x200 size=1 [ N V Z ];
+
 # program counter
-define register offset=0x200 size=8 [ PC ];
+define register offset=0x208 size=8 [ PC ];
 
 # variables
-define register offset=0x208 size=8 [ loc ];
+define register offset=0x210 size=8 [ loc ];
+
+#--------------------------------------------------------------------------
+# Macros
+
+macro iflags(result) {
+  N = result s< 0;
+  Z = result == 0;
+}
 
 #--------------------------------------------------------------------------
 # Tokens
@@ -73,7 +84,7 @@ disp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:2); export ptr; }
 hdisp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:2)*65536; export ptr; }
 
 # PC relative displacement
-disp_al: loc is bdisp [ loc = inst_start + 4; ] { ptr:8 = loc:8 + sext(bdisp:3)*4; export *[ram]:8 ptr; }
+disp_pc: loc is bdisp [ loc = inst_start + 4; ] { ptr:8 = loc:8 + sext(bdisp:3)*4; export *[ram]:8 ptr; }
 
 # jump hint
 hint: jdisp is jdisp { ptr:8 = sext(jdisp:2)*4; export *[ram]:8 ptr; }
@@ -125,18 +136,18 @@ op: rb  is rb  & is_lit = 0 { export rb; }
 #=========================================================================
 
 # PC-relative branch
-:BR   disp_al is opcode=0x30 & disp_al { goto [disp_al]; }
-:BSR  disp_al is opcode=0x34 & disp_al { goto [disp_al]; }
+:BR   disp_pc is opcode=0x30 & disp_pc { goto [disp_pc]; }
+:BSR  disp_pc is opcode=0x34 & disp_pc { goto [disp_pc]; }
 
 # PC-relative branch conditional
-:BEQ  disp_al is opcode=0x39 & disp_al { goto [disp_al]; }
-:BGE  disp_al is opcode=0x3e & disp_al { goto [disp_al]; }
-:BGT  disp_al is opcode=0x3f & disp_al { goto [disp_al]; }
-:BLBC disp_al is opcode=0x38 & disp_al { goto [disp_al]; }
-:BLBS disp_al is opcode=0x3c & disp_al { goto [disp_al]; }
-:BLE  disp_al is opcode=0x3b & disp_al { goto [disp_al]; }
-:BLT  disp_al is opcode=0x3a & disp_al { goto [disp_al]; }
-:BNE  disp_al is opcode=0x3d & disp_al { goto [disp_al]; }
+:BEQ  ra, disp_pc is opcode=0x39 & ra & disp_pc { iflags(ra); if (Z) goto disp_pc; }
+:BGE  ra, disp_pc is opcode=0x3e & ra & disp_pc { iflags(ra); if (!N) goto disp_pc; }
+:BGT  ra, disp_pc is opcode=0x3f & ra & disp_pc { iflags(ra); if (!N && !Z) goto disp_pc; }
+:BLBC ra, disp_pc is opcode=0x38 & ra & disp_pc { tmp:1 = ra:1 ^ 1; if (tmp) goto disp_pc; }
+:BLBS ra, disp_pc is opcode=0x3c & ra & disp_pc { tmp:1 = ra:1 & 1; if (tmp) goto disp_pc; }
+:BLE  ra, disp_pc is opcode=0x3b & ra & disp_pc { iflags(ra); if (N || Z) goto disp_pc; }
+:BLT  ra, disp_pc is opcode=0x3a & ra & disp_pc { iflags(ra); if (N) goto disp_pc; }
+:BNE  ra, disp_pc is opcode=0x3d & ra & disp_pc { iflags(ra); if (!Z) goto disp_pc; }
 
 # jumps
 :JMP ra,(rb),hint is opcode=0x1a & jop = 0 & ra & rb & hint { ptr:8 = rb & ~3; goto [ptr]; }
@@ -188,7 +199,7 @@ op: rb  is rb  & is_lit = 0 { export rb; }
 :S8SUBQ ra, op, rc is opcode=0x10 & ofunc=0x3b & ra & op & rc { tmp = ra << 3; rc = tmp - op; }
 
 # logical functions
-:AND   ra, op, rc is opcode=0x11 & ofunc=0x00 & ra & op & rc    { rc   = ra & op; }
+:AND   ra, op, rc is opcode=0x11 & ofunc=0x00 & ra & op & rc    { rc = ra & op; }
 :BIC   ra, op, rc is opcode=0x11 & ofunc=0x08 & ra & op & rc    { rc = ra & ~op; }
 :BIS   ra, op, rc is opcode=0x11 & ofunc=0x20 & ra & op & rc    { rc = ra | op; }
 :EQV   ra, op, rc is opcode=0x11 & ofunc=0x48 & ra & op & rc    { rc = ra ^ ~op; }
@@ -196,15 +207,21 @@ op: rb  is rb  & is_lit = 0 { export rb; }
 :ORNOT ra, op, rc is opcode=0x11 & ofunc=0x28 & ra & op & rc    { rc = ra | ~op; }
 :XOR   ra, op, rc is opcode=0x11 & ofunc=0x40 & ra & op & rc    { rc = ra ^ op; }
 
+macro cmov(condition,reg,val) {
+  if (!(condition)) goto <skip>;
+  reg = val;
+<skip>
+}
+
 # conditional move
-:CMOVEQ  ra, op, rc is opcode=0x11 & ofunc=0x24 & ra & op & rc   unimpl
-:CMOVGE  ra, op, rc is opcode=0x11 & ofunc=0x46 & ra & op & rc   unimpl
-:CMOVGT  ra, op, rc is opcode=0x11 & ofunc=0x66 & ra & op & rc   unimpl
-:CMOVLBC ra, op, rc is opcode=0x11 & ofunc=0x16 & ra & op & rc   unimpl
-:CMOVLBS ra, op, rc is opcode=0x11 & ofunc=0x14 & ra & op & rc   unimpl
-:CMOVLE  ra, op, rc is opcode=0x11 & ofunc=0x64 & ra & op & rc   unimpl
-:CMOVLT  ra, op, rc is opcode=0x11 & ofunc=0x44 & ra & op & rc   unimpl
-:CMOVNE  ra, op, rc is opcode=0x11 & ofunc=0x26 & ra & op & rc   unimpl
+:CMOVEQ  ra, op, rc is opcode=0x11 & ofunc=0x24 & ra & op & rc  { iflags(ra); cmov(Z,rc,op); }
+:CMOVGE  ra, op, rc is opcode=0x11 & ofunc=0x46 & ra & op & rc  { iflags(ra); cmov(!N,rc,op); }
+:CMOVGT  ra, op, rc is opcode=0x11 & ofunc=0x66 & ra & op & rc  { iflags(ra); cmov(!Z && !N,rc,op); }
+:CMOVLBC ra, op, rc is opcode=0x11 & ofunc=0x16 & ra & op & rc  { iflags(ra); cmov((ra:1 ^ 0x1),rc,op); }
+:CMOVLBS ra, op, rc is opcode=0x11 & ofunc=0x14 & ra & op & rc  { iflags(ra); cmov((ra:1 & 0x1),rc,op); }
+:CMOVLE  ra, op, rc is opcode=0x11 & ofunc=0x64 & ra & op & rc  { iflags(ra); cmov(Z || N,rc,op); }
+:CMOVLT  ra, op, rc is opcode=0x11 & ofunc=0x44 & ra & op & rc  { iflags(ra); cmov(N,rc,op); }
+:CMOVNE  ra, op, rc is opcode=0x11 & ofunc=0x26 & ra & op & rc  { iflags(ra); cmov(!Z,rc,op); }
 
 # shift logical
 :SLL ra, op, rc is opcode=0x12 & ofunc=0x39 & ra & op & rc { rc = ra << op[0,5]; }
