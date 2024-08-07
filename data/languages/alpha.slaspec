@@ -46,7 +46,7 @@ define token inst (32)
         jop    = (14, 15) # jump opcode
         jdisp  = ( 0, 13) # jump displacement
         sbz    = (13, 15) # should be zero
-        lit    = (13, 20) # literal
+        lit    = (13, 20) dec # literal
         is_lit = (12, 12) # bit 12: 0->SBZ, 1->LIT
         ofunc  = ( 5, 11) # operate function
         rc     = ( 0,  4) # Register c
@@ -213,3 +213,44 @@ op: rb  is rb  & is_lit = 0 { export rb; }
 # shift arithmetic
 :SRA ra, op, rc is opcode=0x12 & ofunc=0x3c & ra & op & rc { rc = ra >> op[0,5]; }
 
+#=========================================================================
+# Byte Manipulation Instructions
+#=========================================================================
+
+# compare byte
+:CMPBGE ra, op, rc is opcode=0x10 & ofunc=0x0f & ra & op & rc unimpl
+
+# extract byte
+:EXTBL ra, op, rc is opcode=0x12 & ofunc=0x06 & ra & op & rc unimpl
+:EXTWL ra, op, rc is opcode=0x12 & ofunc=0x16 & ra & op & rc unimpl
+:EXTLL ra, op, rc is opcode=0x12 & ofunc=0x26 & ra & op & rc unimpl
+:EXTQL ra, op, rc is opcode=0x12 & ofunc=0x36 & ra & op & rc unimpl
+:EXTWH ra, op, rc is opcode=0x12 & ofunc=0x5a & ra & op & rc unimpl
+:EXTLH ra, op, rc is opcode=0x12 & ofunc=0x6a & ra & op & rc unimpl
+:EXTQH ra, op, rc is opcode=0x12 & ofunc=0x7a & ra & op & rc unimpl
+
+# byte insert
+:INSBL ra, op, rc is opcode=0x12 & ofunc=0x0b & ra & op & rc unimpl
+:INSWL ra, op, rc is opcode=0x12 & ofunc=0x1b & ra & op & rc unimpl
+:INSLL ra, op, rc is opcode=0x12 & ofunc=0x2b & ra & op & rc unimpl
+:INSQL ra, op, rc is opcode=0x12 & ofunc=0x3b & ra & op & rc unimpl
+:INSWH ra, op, rc is opcode=0x12 & ofunc=0x57 & ra & op & rc unimpl
+:INSLH ra, op, rc is opcode=0x12 & ofunc=0x67 & ra & op & rc unimpl
+:INSQH ra, op, rc is opcode=0x12 & ofunc=0x77 & ra & op & rc unimpl
+
+# byte mask
+:MSKBL ra, op, rc is opcode=0x12 & ofunc=0x02 & ra & op & rc unimpl
+:MSKWL ra, op, rc is opcode=0x12 & ofunc=0x12 & ra & op & rc unimpl
+:MSKLL ra, op, rc is opcode=0x12 & ofunc=0x22 & ra & op & rc unimpl
+:MSKQL ra, op, rc is opcode=0x12 & ofunc=0x32 & ra & op & rc unimpl
+:MSKWH ra, op, rc is opcode=0x12 & ofunc=0x52 & ra & op & rc unimpl
+:MSKLH ra, op, rc is opcode=0x12 & ofunc=0x62 & ra & op & rc unimpl
+:MSKQH ra, op, rc is opcode=0x12 & ofunc=0x72 & ra & op & rc unimpl
+
+# sign extend
+:SEXTB op, rc is opcode=0x1c & ofunc=0x00 & ra=31 & op & rc { rc = sext(op:1); }
+:SEXTW op, rc is opcode=0x1c & ofunc=0x01 & ra=31 & op & rc { rc = sext(op:2); }
+
+# zero bytes
+:ZAP    ra, op, rc is opcode=0x12 & ofunc=0x30 & ra & op & rc unimpl
+:ZAPNOT ra, op, rc is opcode=0x12 & ofunc=0x31 & ra & op & rc unimpl
