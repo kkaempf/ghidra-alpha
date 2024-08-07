@@ -186,3 +186,12 @@ op: rb  is rb  & is_lit = 0 { export rb; }
 :SUBQ^"/V"   ra, op, rc is opcode=0x10 & ofunc=0x69 & ra & op & rc { rc = ra - op; }
 :S4SUBQ ra, op, rc is opcode=0x10 & ofunc=0x2b & ra & op & rc { tmp = ra << 2; rc = tmp - op; }
 :S8SUBQ ra, op, rc is opcode=0x10 & ofunc=0x3b & ra & op & rc { tmp = ra << 3; rc = tmp - op; }
+
+# logical functions
+:AND   ra, op, rc is opcode=0x11 & ofunc=0x00 & ra & op & rc    { rc   = ra & op; }
+:BIC   ra, op, rc is opcode=0x11 & ofunc=0x08 & ra & op & rc    { rc = ra & ~op; }
+:BIS   ra, op, rc is opcode=0x11 & ofunc=0x20 & ra & op & rc    { rc = ra | op; }
+:EQV   ra, op, rc is opcode=0x11 & ofunc=0x48 & ra & op & rc    { rc = ra ^ ~op; }
+:NOT       op, rc is opcode=0x11 & ofunc=0x28 & ra=31 & op & rc { rc = ~op; }
+:ORNOT ra, op, rc is opcode=0x11 & ofunc=0x28 & ra & op & rc    { rc = ra | ~op; }
+:XOR   ra, op, rc is opcode=0x11 & ofunc=0x40 & ra & op & rc    { rc = ra ^ op; }
