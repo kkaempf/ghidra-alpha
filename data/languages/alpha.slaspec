@@ -35,39 +35,22 @@ define register offset=0x208 size=8 [ loc ];
 #--------------------------------------------------------------------------
 # Tokens
 
-# PALcode format
-#define token palcode (32)
-#        opcode    = (26, 31)
-#        number    = ( 0, 25) dec # PALcode function
-#;
-
-# Branch format
-#define token branch (32)
-#        opcode    = (26, 31)
-#        ra        = (21, 25) # Register a
-#        bdisp     = ( 0, 20) # branch displacement
-#;
-
-# Memory format
-define token memory (32)
-        opcode    = (26, 31)
-        ra        = (21, 25) # Register a
-        bdisp     = ( 0, 20) # branch displacement
-        rb        = (16, 20) # Register b
-        function  = ( 0, 15) # memory format with function code
-        mdisp     = ( 0, 15) dec # memory displacement
-        jop       = (14, 15) # jump opcode
-        jdisp     = ( 0, 13) # jump displacement
-        sbz       = (13, 15) # should be zero
-        lit       = (13, 20) # literal
-        bit12     = (12, 12) # bit 12: 0->SBZ, 1->LIT
+# Instruction format
+define token inst (32)
+        opcode = (26, 31)
+        ra     = (21, 25) # Register a
+        bdisp  = ( 0, 20) # branch displacement
+        rb     = (16, 20) # Register b
+        mfunc  = ( 0, 15) # memory format with function code
+        mdisp  = ( 0, 15) dec # memory displacement
+        jop    = (14, 15) # jump opcode
+        jdisp  = ( 0, 13) # jump displacement
+        sbz    = (13, 15) # should be zero
+        lit    = (13, 20) # literal
+        is_lit = (12, 12) # bit 12: 0->SBZ, 1->LIT
+        ofunc  = ( 5, 11) # operate function
+        rc     = ( 0,  4) # Register c
 ;
-
-# Operate format
-#define token operate (32)
-#        function  = ( 5, 15) # memory instruction with function code
-#        rc        = ( 0,  4) # Register c
-#;
 
 #--------------------------------------------------------------------------
 # Variables
@@ -76,8 +59,8 @@ attach variables [ ra ] [ R0  R1  R2  R3  R4  R5  R6  R7  R8  R9  R10 R11 R12 R1
                           R16 R17 R18 R19 R20 R21 R22 R23 R24 R25 R26 R27 R28 R29 R30 zero];
 attach variables [ rb ] [ R0  R1  R2  R3  R4  R5  R6  R7  R8  R9  R10 R11 R12 R13 R14 R15
                           R16 R17 R18 R19 R20 R21 R22 R23 R24 R25 R26 R27 R28 R29 R30 zero];
-#attach variables [ rc ] [ R0  R1  R2  R3  R4  R5  R6  R7  R8  R9  R10 R11 R12 R13 R14 R15
-#                          R16 R17 R18 R19 R20 R21 R22 R23 R24 R25 R26 R27 R28 R29 R30 zero];
+attach variables [ rc ] [ R0  R1  R2  R3  R4  R5  R6  R7  R8  R9  R10 R11 R12 R13 R14 R15
+                          R16 R17 R18 R19 R20 R21 R22 R23 R24 R25 R26 R27 R28 R29 R30 zero];
 
 #--------------------------------------------------------------------------
 # Tables
@@ -94,6 +77,10 @@ disp_al: loc is bdisp [ loc = inst_start + 4; ] { ptr:8 = loc:8 + sext(bdisp:3)*
 
 # jump hint
 hint: jdisp is jdisp { ptr:8 = sext(jdisp:2)*4; export *[ram]:8 ptr; }
+
+# arith operand
+op: lit is lit & is_lit = 1 { export *[const]:8 lit; }
+op: rb  is rb  & is_lit = 0 { export rb; }
 
 #--------------------------------------------------------------------------
 # Mnemonics
@@ -156,3 +143,46 @@ hint: jdisp is jdisp { ptr:8 = sext(jdisp:2)*4; export *[ram]:8 ptr; }
 :JSR ra,(rb),hint is opcode=0x1a & jop = 1 & ra & rb & hint { ptr:8 = rb & ~3; goto [ptr]; }
 :RET ra,(rb),hint is opcode=0x1a & jop = 2 & ra & rb & hint { ptr:8 = rb & ~3; goto [ptr]; }
 :JSR_COROUTINE ra,(rb),hint is opcode=0x1a & jop = 3 & ra & rb & hint { ptr:8 = rb & ~3; goto [ptr]; }
+
+#=========================================================================
+# Integer Arithmetic Instructions
+#=========================================================================
+
+# add
+:ADDL   ra, op, rc is opcode=0x10 & ofunc=0x00 & ra & op & rc { tmp = ra:4 + op:4; rc = sext(tmp); }
+:ADDL^"/V"   ra, op, rc is opcode=0x10 & ofunc=0x40 & ra & op & rc { tmp = ra:4 + op:4; rc = sext(tmp); }
+:S4ADDL ra, op, rc is opcode=0x10 & ofunc=0x02 & ra & op & rc { tmp = ra:4 << 2; tmp = tmp + op:4; rc = sext(tmp); }
+:S8ADDL ra, op, rc is opcode=0x10 & ofunc=0x12 & ra & op & rc { tmp = ra:4 << 3; tmp = tmp + op:4; rc = sext(tmp); }
+:ADDQ   ra, op, rc is opcode=0x10 & ofunc=0x20 & ra & op & rc { rc = ra + op; }
+:ADDQ^"/V"   ra, op, rc is opcode=0x10 & ofunc=0x60 & ra & op & rc { rc = ra + op; }
+:S4ADDQ ra, op, rc is opcode=0x10 & ofunc=0x22 & ra & op & rc { tmp = ra << 2; rc = tmp + op; }
+:S8ADDQ ra, op, rc is opcode=0x10 & ofunc=0x32 & ra & op & rc { tmp = ra << 3; rc = tmp + op; }
+
+# compare
+:CMPEQ  ra, op, rc is opcode=0x10 & ofunc=0x2d & ra & op & rc { rc = zext(ra == op); }
+:CMPLE  ra, op, rc is opcode=0x10 & ofunc=0x6d & ra & op & rc { rc = zext(ra == op) + zext(ra s< op); }
+:CMPLT  ra, op, rc is opcode=0x10 & ofunc=0x4d & ra & op & rc { rc = zext(ra s< op); }
+:CMPULE ra, op, rc is opcode=0x10 & ofunc=0x3d & ra & op & rc { rc = zext(ra == op) + zext(ra < op); }
+:CMPULT ra, op, rc is opcode=0x10 & ofunc=0x1d & ra & op & rc { rc = zext(ra < op); }
+
+# count bits
+:CTLZ   rb, rc     is opcode=0x1c & ofunc=0x32 & ra=31 & rb & rc unimpl
+:CTPOP  rb, rc     is opcode=0x1c & ofunc=0x30 & ra=31 & rb & rc unimpl
+:CTTZ   rb, rc     is opcode=0x1c & ofunc=0x33 & ra=31 & rb & rc unimpl
+
+# multiply
+:MULL      ra, op, rc is opcode=0x13 & ofunc=0x00 & ra & op & rc { rc = sext(ra:4 * op:4); }
+:MULL^"/V" ra, op, rc is opcode=0x13 & ofunc=0x40 & ra & op & rc { rc = sext(ra:4 * op:4); }
+:MULQ      ra, op, rc is opcode=0x13 & ofunc=0x20 & ra & op & rc { rc = ra * op; }
+:MULQ^"/V" ra, op, rc is opcode=0x13 & ofunc=0x60 & ra & op & rc { rc = ra * op; }
+:UMULH     ra, op, rc is opcode=0x13 & ofunc=0x30 & ra & op & rc { tmp:16 = zext(ra) * zext(op); tmp = (tmp >> 64); rc = tmp:8; }
+
+# subtract
+:SUBL   ra, op, rc is opcode=0x10 & ofunc=0x09 & ra & op & rc { tmp = ra:4 - op:4; rc = sext(tmp); }
+:SUBL^"/V"   ra, op, rc is opcode=0x10 & ofunc=0x49 & ra & op & rc { tmp = ra:4 - op:4; rc = sext(tmp); }
+:S4SUBL ra, op, rc is opcode=0x10 & ofunc=0x0b & ra & op & rc { tmp = ra:4 << 2; tmp = tmp - op:4; rc = sext(tmp); }
+:S8SUBL ra, op, rc is opcode=0x10 & ofunc=0x1b & ra & op & rc { tmp = ra:4 << 3; tmp = tmp - op:4; rc = sext(tmp); }
+:SUBQ   ra, op, rc is opcode=0x10 & ofunc=0x29 & ra & op & rc { rc = ra - op; }
+:SUBQ^"/V"   ra, op, rc is opcode=0x10 & ofunc=0x69 & ra & op & rc { rc = ra - op; }
+:S4SUBQ ra, op, rc is opcode=0x10 & ofunc=0x2b & ra & op & rc { tmp = ra << 2; rc = tmp - op; }
+:S8SUBQ ra, op, rc is opcode=0x10 & ofunc=0x3b & ra & op & rc { tmp = ra << 3; rc = tmp - op; }
