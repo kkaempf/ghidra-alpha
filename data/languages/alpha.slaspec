@@ -195,3 +195,21 @@ op: rb  is rb  & is_lit = 0 { export rb; }
 :NOT       op, rc is opcode=0x11 & ofunc=0x28 & ra=31 & op & rc { rc = ~op; }
 :ORNOT ra, op, rc is opcode=0x11 & ofunc=0x28 & ra & op & rc    { rc = ra | ~op; }
 :XOR   ra, op, rc is opcode=0x11 & ofunc=0x40 & ra & op & rc    { rc = ra ^ op; }
+
+# conditional move
+:CMOVEQ  ra, op, rc is opcode=0x11 & ofunc=0x24 & ra & op & rc   unimpl
+:CMOVGE  ra, op, rc is opcode=0x11 & ofunc=0x46 & ra & op & rc   unimpl
+:CMOVGT  ra, op, rc is opcode=0x11 & ofunc=0x66 & ra & op & rc   unimpl
+:CMOVLBC ra, op, rc is opcode=0x11 & ofunc=0x16 & ra & op & rc   unimpl
+:CMOVLBS ra, op, rc is opcode=0x11 & ofunc=0x14 & ra & op & rc   unimpl
+:CMOVLE  ra, op, rc is opcode=0x11 & ofunc=0x64 & ra & op & rc   unimpl
+:CMOVLT  ra, op, rc is opcode=0x11 & ofunc=0x44 & ra & op & rc   unimpl
+:CMOVNE  ra, op, rc is opcode=0x11 & ofunc=0x26 & ra & op & rc   unimpl
+
+# shift logical
+:SLL ra, op, rc is opcode=0x12 & ofunc=0x39 & ra & op & rc { rc = ra << op[0,5]; }
+:SRL ra, op, rc is opcode=0x12 & ofunc=0x34 & ra & op & rc { rc = ra >> op[0,5]; } #FIXME
+
+# shift arithmetic
+:SRA ra, op, rc is opcode=0x12 & ofunc=0x3c & ra & op & rc { rc = ra >> op[0,5]; }
+
