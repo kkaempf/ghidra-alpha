@@ -2,3 +2,4 @@
 *.sla
 *.pdf
 core.*
+*.out
