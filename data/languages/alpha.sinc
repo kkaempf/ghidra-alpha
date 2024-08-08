@@ -43,6 +43,22 @@ macro iflags(result) {
   Z = result == 0;
 }
 
+macro Bcc(reg,expr,target) {
+  iflags(reg);
+  if (!(expr)) goto <cont>;
+  reg = inst_next;
+  goto target;
+<cont>
+}
+
+macro Bexpr(reg,expr,target) {
+  local tmp:1 = expr;
+  if (!(tmp)) goto <cont>;
+  reg = inst_next;
+  goto target;
+<cont>
+}
+
 #--------------------------------------------------------------------------
 # Tokens
 
@@ -85,7 +101,7 @@ disp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:2); export ptr; }
 hdisp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:2)*65536; export ptr; }
 
 # PC relative displacement
-disp_pc: loc is bdisp [ loc = inst_start + 4; ] { ptr:8 = loc:8 + sext(bdisp:3)*4; export *[ram]:8 ptr; }
+disp_pc: loc is bdisp [ loc = inst_start + 4 + bdisp * 4; ] { export *[ram]:8 loc; }
 
 # jump hint
 hint: jdisp is jdisp { ptr:8 = sext(jdisp:2)*4; export *[ram]:8 ptr; }
@@ -137,24 +153,24 @@ op: rb  is rb  & is_lit = 0 { export rb; }
 #=========================================================================
 
 # PC-relative branch
-:BR   disp_pc is opcode=0x30 & disp_pc { goto [disp_pc]; }
-:BSR  disp_pc is opcode=0x34 & disp_pc { goto [disp_pc]; }
+:BR   ra, disp_pc is opcode=0x30 & ra & disp_pc { ra = inst_next; goto disp_pc; }
+:BSR  ra, disp_pc is opcode=0x34 & ra & disp_pc { ra = inst_next; call disp_pc; }
 
 # PC-relative branch conditional
-:BEQ  ra, disp_pc is opcode=0x39 & ra & disp_pc { iflags(ra); if (Z) goto disp_pc; }
-:BGE  ra, disp_pc is opcode=0x3e & ra & disp_pc { iflags(ra); if (!N) goto disp_pc; }
-:BGT  ra, disp_pc is opcode=0x3f & ra & disp_pc { iflags(ra); if (!N && !Z) goto disp_pc; }
-:BLBC ra, disp_pc is opcode=0x38 & ra & disp_pc { tmp:1 = ra:1 ^ 1; if (tmp) goto disp_pc; }
-:BLBS ra, disp_pc is opcode=0x3c & ra & disp_pc { tmp:1 = ra:1 & 1; if (tmp) goto disp_pc; }
-:BLE  ra, disp_pc is opcode=0x3b & ra & disp_pc { iflags(ra); if (N || Z) goto disp_pc; }
-:BLT  ra, disp_pc is opcode=0x3a & ra & disp_pc { iflags(ra); if (N) goto disp_pc; }
-:BNE  ra, disp_pc is opcode=0x3d & ra & disp_pc { iflags(ra); if (!Z) goto disp_pc; }
+:BEQ  ra, disp_pc is opcode=0x39 & ra & disp_pc { Bcc(ra, Z, disp_pc); }
+:BGE  ra, disp_pc is opcode=0x3e & ra & disp_pc { Bcc(ra, !N, disp_pc); }
+:BGT  ra, disp_pc is opcode=0x3f & ra & disp_pc { Bcc(ra, !N && !Z, disp_pc); }
+:BLBC ra, disp_pc is opcode=0x38 & ra & disp_pc { Bexpr(ra, ra:1 ^ 1, disp_pc); }
+:BLBS ra, disp_pc is opcode=0x3c & ra & disp_pc { Bexpr(ra, ra:1 & 1, disp_pc); }
+:BLE  ra, disp_pc is opcode=0x3b & ra & disp_pc { Bcc(ra, N || Z, disp_pc); }
+:BLT  ra, disp_pc is opcode=0x3a & ra & disp_pc { Bcc(ra, N, disp_pc); }
+:BNE  ra, disp_pc is opcode=0x3d & ra & disp_pc { Bcc(ra, !Z, disp_pc); }
 
 # jumps
-:JMP ra,(rb),hint is opcode=0x1a & jop = 0 & ra & rb & hint { ptr:8 = rb & ~3; goto [ptr]; }
-:JSR ra,(rb),hint is opcode=0x1a & jop = 1 & ra & rb & hint { ptr:8 = rb & ~3; goto [ptr]; }
-:RET ra,(rb),hint is opcode=0x1a & jop = 2 & ra & rb & hint { ptr:8 = rb & ~3; goto [ptr]; }
-:JSR_COROUTINE ra,(rb),hint is opcode=0x1a & jop = 3 & ra & rb & hint { ptr:8 = rb & ~3; goto [ptr]; }
+:JMP ra,(rb),hint is opcode=0x1a & jop = 0 & ra & rb & hint { ra = inst_next; goto rb; }
+:JSR ra,(rb),hint is opcode=0x1a & jop = 1 & ra & rb & hint { ra = inst_next; call rb; }
+:RET ra,(rb),hint is opcode=0x1a & jop = 2 & ra & rb & hint { ra = inst_next; goto rb; }
+:JSR_COROUTINE ra,(rb),hint is opcode=0x1a & jop = 3 & ra & rb & hint { ra = inst_next; call rb; }
 
 #=========================================================================
 # Integer Arithmetic Instructions
