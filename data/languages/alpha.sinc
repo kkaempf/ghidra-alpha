@@ -67,14 +67,14 @@ define token inst (32)
         opcode = (26, 31)
         pal    = ( 0, 25) dec # Palcode
         ra     = (21, 25) # Register a
-        bdisp  = ( 0, 20) # branch displacement
+        bdisp  = ( 0, 20) signed # branch displacement
         rb     = (16, 20) # Register b
         mfunc  = ( 0, 15) # memory format with function code
-        mdisp  = ( 0, 15) dec # memory displacement
+        mdisp  = ( 0, 15) signed dec # memory displacement
         jop    = (14, 15) # jump opcode
-        jdisp  = ( 0, 13) # jump displacement
+        jdisp  = ( 0, 13) signed # jump displacement
         sbz    = (13, 15) # should be zero
-        lit    = (13, 20) dec # literal
+        lit    = (13, 20) signed dec # literal
         is_lit = (12, 12) # bit 12: 0->SBZ, 1->LIT
         ofunc  = ( 5, 11) # operate function
         rc     = ( 0,  4) # Register c
@@ -101,7 +101,7 @@ disp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:2); export ptr; }
 hdisp_regb: mdisp(rb) is mdisp & rb { ptr:8 = rb + sext(mdisp:2)*65536; export ptr; }
 
 # PC relative displacement
-disp_pc: loc is bdisp [ loc = inst_start + 4 + bdisp * 4; ] { export *[ram]:8 loc; }
+disp_pc: loc is bdisp [ loc = inst_start + 4 + (bdisp << 2); ] { export *[ram]:8 loc; }
 
 # jump hint
 hint: jdisp is jdisp { ptr:8 = sext(jdisp:2)*4; export *[ram]:8 ptr; }
