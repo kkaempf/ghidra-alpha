@@ -1,8 +1,8 @@
-all: data/languages/alpha.sla
+all: data/languages/alpha.sla test
 
 data/languages/alpha.sla: data/languages/alpha.slaspec 
 	/abuild/projects/Ghidra/ghidra/Ghidra/Features/Decompiler/src/decompile/cpp/sleigh_dbg $^
-	sleigh $^ $@
+	sleigh -u $^ $@
 
 test:
 	make -C tests
