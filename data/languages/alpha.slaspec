@@ -49,6 +49,7 @@ macro iflags(result) {
 # Instruction format
 define token inst (32)
         opcode = (26, 31)
+        pal    = ( 0, 25) dec # Palcode
         ra     = (21, 25) # Register a
         bdisp  = ( 0, 20) # branch displacement
         rb     = (16, 20) # Register b
@@ -271,3 +272,9 @@ macro cmov(condition,reg,val) {
 # zero bytes
 :ZAP    ra, op, rc is opcode=0x12 & ofunc=0x30 & ra & op & rc unimpl
 :ZAPNOT ra, op, rc is opcode=0x12 & ofunc=0x31 & ra & op & rc unimpl
+
+#=========================================================================
+# Miscellaneous Instructions
+#=========================================================================
+
+:CALL_PAL pal is opcode=0x00 & pal unimpl
