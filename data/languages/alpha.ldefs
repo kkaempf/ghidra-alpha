@@ -4,13 +4,39 @@
   <language processor="Alpha"
             endian="little"
             size="64"
-            variant="21064"
+            variant="21064 (EV4, EV45)"
             version="1.0"
-            slafile="alpha.sla"
+            slafile="21064.sla"
             processorspec="alpha.pspec"
             manualindexfile="../manuals/alpha.idx"
             id="alpha:LE:64:default">
-    <description>DEC Alpha</description>
+    <description>DEC Alpha 21064, 21064A, 21066, 21066A, 21068 (EV4/EV45/LCA/LCA45 chips)</description>
+    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <external_name tool="gnu" name="alpha"/>
+  </language>
+  <language processor="Alpha"
+            endian="little"
+            size="64"
+            variant="21164 (EV5)"
+            version="1.0"
+            slafile="21164.sla"
+            processorspec="alpha.pspec"
+            manualindexfile="../manuals/alpha.idx"
+            id="alpha:LE:64:default">
+    <description>DEC Alpha 21164 (EV5)</description>
+    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <external_name tool="gnu" name="alpha"/>
+  </language>
+  <language processor="Alpha"
+            endian="little"
+            size="64"
+            variant="21264 (EV6)"
+            version="1.0"
+            slafile="21264.sla"
+            processorspec="alpha.pspec"
+            manualindexfile="../manuals/alpha.idx"
+            id="alpha:LE:64:default">
+    <description>DEC Alpha 21164A (EV56), 21164PC (PCA56), 21264 (EV6)</description>
     <compiler name="default" spec="alpha.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>

@@ -1,0 +1,3 @@
+@define AXP21164 ""
+
+@include "alpha.sinc"

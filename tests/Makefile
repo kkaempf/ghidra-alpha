@@ -1,7 +1,9 @@
 .PHONY: tests
 
 tests: *.hex
-	./runtests $^
+	./run21064 $^
+	./run21164 $^
+	./run21264 $^
 
 clean:
 	rm -rf *.out

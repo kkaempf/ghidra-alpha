@@ -1,6 +1,14 @@
-all: data/languages/alpha.sla test
+all: data/languages/21064.sla data/languages/21164.sla data/languages/21264.sla test
 
-data/languages/alpha.sla: data/languages/alpha.slaspec 
+data/languages/21064.sla: data/languages/21064.slaspec 
+	/abuild/projects/Ghidra/ghidra/Ghidra/Features/Decompiler/src/decompile/cpp/sleigh_dbg $^
+	sleigh -u $^ $@
+
+data/languages/21164.sla: data/languages/21164.slaspec 
+	/abuild/projects/Ghidra/ghidra/Ghidra/Features/Decompiler/src/decompile/cpp/sleigh_dbg $^
+	sleigh -u $^ $@
+
+data/languages/21264.sla: data/languages/21264.slaspec 
 	/abuild/projects/Ghidra/ghidra/Ghidra/Features/Decompiler/src/decompile/cpp/sleigh_dbg $^
 	sleigh -u $^ $@
 
