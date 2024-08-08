@@ -9,7 +9,7 @@
             slafile="21064.sla"
             processorspec="alpha.pspec"
             manualindexfile="../manuals/alpha.idx"
-            id="alpha:LE:64:default">
+            id="21064:LE:64:default">
     <description>DEC Alpha 21064, 21064A, 21066, 21066A, 21068 (EV4/EV45/LCA/LCA45 chips)</description>
     <compiler name="default" spec="alpha.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
@@ -22,7 +22,7 @@
             slafile="21164.sla"
             processorspec="alpha.pspec"
             manualindexfile="../manuals/alpha.idx"
-            id="alpha:LE:64:default">
+            id="21164:LE:64:default">
     <description>DEC Alpha 21164 (EV5)</description>
     <compiler name="default" spec="alpha.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
@@ -35,7 +35,7 @@
             slafile="21264.sla"
             processorspec="alpha.pspec"
             manualindexfile="../manuals/alpha.idx"
-            id="alpha:LE:64:default">
+            id="21264:LE:64:default">
     <description>DEC Alpha 21164A (EV56), 21164PC (PCA56), 21264 (EV6)</description>
     <compiler name="default" spec="alpha.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
