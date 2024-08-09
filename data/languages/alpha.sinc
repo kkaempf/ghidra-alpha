@@ -43,6 +43,12 @@ macro iflags(result) {
   Z = result == 0;
 }
 
+# FIXME
+macro fflags(result) {
+  N = result s< 0;
+  Z = result == 0;
+}
+
 macro Bcc(reg,expr,target) {
   iflags(reg);
   if (!(expr)) goto <cont>;
@@ -54,6 +60,14 @@ macro Bcc(reg,expr,target) {
 macro Bexpr(reg,expr,target) {
   local tmp:1 = expr;
   if (!(tmp)) goto <cont>;
+  reg = inst_next;
+  goto target;
+<cont>
+}
+
+macro FBcc(reg,expr,target) {
+  fflags(reg);
+  if (!(expr)) goto <cont>;
   reg = inst_next;
   goto target;
 <cont>
@@ -306,6 +320,14 @@ macro cmov(condition,reg,val) {
 :STG fa, disp_regb is opcode=0x25 & fa & disp_regb { *:8 disp_regb = fa; }
 :STS fa, disp_regb is opcode=0x26 & fa & disp_regb { *:8 disp_regb = fa; }
 :STT fa, disp_regb is opcode=0x27 & fa & disp_regb { *:8 disp_regb = fa; }
+
+# Branch Format Floating-Point Instructions
+:FBEQ fa, disp_pc is opcode=0x31 & fa & disp_pc { FBcc(fa, Z, disp_pc); }
+:FBGE fa, disp_pc is opcode=0x36 & fa & disp_pc { FBcc(fa, !N, disp_pc); }
+:FBGT fa, disp_pc is opcode=0x37 & fa & disp_pc { FBcc(fa, !N && !Z, disp_pc); }
+:FBLE fa, disp_pc is opcode=0x33 & fa & disp_pc { FBcc(fa, N || Z, disp_pc); }
+:FBLT fa, disp_pc is opcode=0x32 & fa & disp_pc { FBcc(fa, N, disp_pc); }
+:FBNE fa, disp_pc is opcode=0x35 & fa & disp_pc { FBcc(fa, !Z, disp_pc); }
 
 #=========================================================================
 # Miscellaneous Instructions
