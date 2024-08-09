@@ -67,6 +67,7 @@ define token inst (32)
         opcode = (26, 31)
         pal    = ( 0, 25) dec # Palcode
         ra     = (21, 25) # Register a
+        fa     = (21, 25) # Floating-Point Register a
         bdisp  = ( 0, 20) signed # branch displacement
         rb     = (16, 20) # Register b
         mfunc  = ( 0, 15) # memory format with function code
@@ -89,6 +90,8 @@ attach variables [ rb ] [ R0  R1  R2  R3  R4  R5  R6  R7  R8  R9  R10 R11 R12 R1
                           R16 R17 R18 R19 R20 R21 R22 R23 R24 AI  RA  PV  R28 FP  SP  RZ ];
 attach variables [ rc ] [ R0  R1  R2  R3  R4  R5  R6  R7  R8  R9  R10 R11 R12 R13 R14 R15
                           R16 R17 R18 R19 R20 R21 R22 R23 R24 AI  RA  PV  R28 FP  SP  RZ ];
+attach variables [ fa ] [ F0  F1  F2  F3  F4  F5  F6  F7  F8  F9  F10 F11 F12 F13 F14 F15
+                          F16 F17 F18 F19 F20 F21 F22 F23 F24 F25 F26 F27 F28 F29 F30 FZ ];
 
 #--------------------------------------------------------------------------
 # Tables
@@ -288,6 +291,21 @@ macro cmov(condition,reg,val) {
 # zero bytes
 :ZAP    ra, op, rc is opcode=0x12 & ofunc=0x30 & ra & op & rc unimpl
 :ZAPNOT ra, op, rc is opcode=0x12 & ofunc=0x31 & ra & op & rc unimpl
+
+#=========================================================================
+# Floating-Point Instructions
+#=========================================================================
+
+# Memory Format Floating-Point Instructions
+:LDF fa, disp_regb is opcode=0x20 & fa & disp_regb { fa = disp_regb; }
+:LDG fa, disp_regb is opcode=0x21 & fa & disp_regb { fa = disp_regb; }
+:LDS fa, disp_regb is opcode=0x22 & fa & disp_regb { fa = disp_regb; }
+:LDT fa, disp_regb is opcode=0x23 & fa & disp_regb { fa = disp_regb; }
+
+:STF fa, disp_regb is opcode=0x24 & fa & disp_regb { *:4 disp_regb = fa:4; }
+:STG fa, disp_regb is opcode=0x25 & fa & disp_regb { *:8 disp_regb = fa; }
+:STS fa, disp_regb is opcode=0x26 & fa & disp_regb { *:8 disp_regb = fa; }
+:STT fa, disp_regb is opcode=0x27 & fa & disp_regb { *:8 disp_regb = fa; }
 
 #=========================================================================
 # Miscellaneous Instructions
