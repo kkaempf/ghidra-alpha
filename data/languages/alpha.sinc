@@ -237,6 +237,7 @@ fcc: "GT" is ccode=7 & is_f = 1 & fa { tmp:1 = (fa s> 0); export tmp; }
 :BIC   ra, op, rc is opcode=0x11 & ofunc=0x08 & ra & op & rc    { rc = ra & ~op; }
 :CLR           rc is opcode=0x11 & ofunc=0x20 & ra=31 & rb=31 & is_lit=0 & rc { rc = 0; }
 :MOV       op, rc is opcode=0x11 & ofunc=0x20 & ra=31 & op & rc { rc = op; }
+:MOV       op, rc is opcode=0x11 & ofunc=0x20 & ra=rb & op & rc { rc = op; }
 :BIS   ra, op, rc is opcode=0x11 & ofunc=0x20 & ra & op & rc    { rc = ra | op; }
 :EQV   ra, op, rc is opcode=0x11 & ofunc=0x48 & ra & op & rc    { rc = ra ^ ~op; }
 :NOT       op, rc is opcode=0x11 & ofunc=0x28 & ra=31 & op & rc { rc = ~op; }
