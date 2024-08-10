@@ -331,4 +331,17 @@ macro cmov(condition,reg,val) {
 # Miscellaneous Instructions
 #=========================================================================
 
+# required PALcode opcodes for all implementations
+:HALT         is opcode=0x00 & pal=0 unimpl
+:DRAINA       is opcode=0x00 & pal=2 unimpl
+:IMB          is opcode=0x00 & pal=0x86 unimpl
+
+# PAL
 :CALL_PAL pal is opcode=0x00 & pal unimpl
+
+# Opcodes reserved to PALcode
+:PAL19    pal is opcode=0x19 & pal unimpl
+:PAL1B    pal is opcode=0x1b & pal unimpl
+:PAL1D    pal is opcode=0x1d & pal unimpl
+:PAL1E    pal is opcode=0x1e & pal unimpl
+:PAL1F    pal is opcode=0x1f & pal unimpl
