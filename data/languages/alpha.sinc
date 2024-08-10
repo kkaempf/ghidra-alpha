@@ -27,7 +27,7 @@ define register offset=0x100 size=8 [ F0  F1  F2  F3  F4  F5  F6  F7  F8  F9  F1
                                       F16 F17 F18 F19 F20 F21 F22 F23 F24 F25 F26 F27 F28 F29 F30 FZ ];
 
 # flags: negative, overflow, zero
-define register offset=0x200 size=1 [ N V Z ];
+define register offset=0x200 size=1 [ N_F V_F Z_F ];
 
 # program counter
 define register offset=0x208 size=8 [ PC ];
@@ -39,35 +39,19 @@ define register offset=0x210 size=8 [ loc ];
 # Macros
 
 macro iflags(result) {
-  N = result s< 0;
-  Z = result == 0;
+  N_F = result s< 0;
+  Z_F = result == 0;
 }
 
 # FIXME
 macro fflags(result) {
-  N = result s< 0;
-  Z = result == 0;
-}
-
-macro Bcc(reg,expr,target) {
-  iflags(reg);
-  if (!(expr)) goto <cont>;
-  reg = inst_next;
-  goto [target];
-<cont>
+  N_F = result s< 0;
+  Z_F = result == 0;
 }
 
 macro Bexpr(reg,expr,target) {
   local tmp:1 = expr;
   if (!(tmp)) goto <cont>;
-  reg = inst_next;
-  goto [target];
-<cont>
-}
-
-macro FBcc(reg,expr,target) {
-  fflags(reg);
-  if (!(expr)) goto <cont>;
   reg = inst_next;
   goto [target];
 <cont>
@@ -79,6 +63,9 @@ macro FBcc(reg,expr,target) {
 # Instruction format
 define token inst (32)
         opcode = (26, 31)
+        bcode  = (30, 31) # branch code
+        is_f   = (29, 29) # float flag for branch
+        ccode  = (26, 28) # condition code
         pal    = ( 0, 25) dec # Palcode
         ra     = (21, 25) # Register a
         fa     = (21, 25) # Floating-Point Register a
@@ -127,6 +114,24 @@ hint: jdisp is jdisp { ptr:8 = sext(jdisp:2)*4; export *[ram]:8 ptr; }
 op: lit is lit & is_lit = 1 { export *[const]:8 lit; }
 op: rb  is rb  & is_lit = 0 { export rb; }
 
+# integer condition codes (for branch)
+
+icc: "EQ" is ccode=1 & is_f = 0 & ra { tmp:1 = (ra == 0); export tmp; }
+icc: "LT" is ccode=2 & is_f = 0 & ra { tmp:1 = (ra s< 0); export tmp; }
+icc: "LE" is ccode=3 & is_f = 0 & ra { tmp:1 = !(ra s> 0); export tmp; }
+icc: "NE" is ccode=5 & is_f = 0 & ra { tmp:1 = (ra != 0); export tmp; }
+icc: "GE" is ccode=6 & is_f = 0 & ra { tmp:1 = !(ra s< 0); export tmp; }
+icc: "GT" is ccode=7 & is_f = 0 & ra { tmp:1 = (ra s> 0); export tmp; }
+
+# float condition codes (for branch)
+# fixme
+fcc: "EQ" is ccode=1 & is_f = 1 & fa { tmp:1 = (fa == 0); export tmp; }
+fcc: "LT" is ccode=2 & is_f = 1 & fa { tmp:1 = (fa s< 0); export tmp; }
+fcc: "LE" is ccode=3 & is_f = 1 & fa { tmp:1 = !(fa s> 0); export tmp; }
+fcc: "NE" is ccode=5 & is_f = 1 & fa { tmp:1 = (fa != 0); export tmp; }
+fcc: "GE" is ccode=6 & is_f = 1 & fa { tmp:1 = !(fa s< 0); export tmp; }
+fcc: "GT" is ccode=7 & is_f = 1 & fa { tmp:1 = (fa s> 0); export tmp; }
+
 #--------------------------------------------------------------------------
 # Mnemonics
 
@@ -174,14 +179,9 @@ op: rb  is rb  & is_lit = 0 { export rb; }
 :BSR  ra, disp_pc is opcode=0x34 & ra & disp_pc { ra = inst_next; call [disp_pc]; }
 
 # PC-relative branch conditional
-:BEQ  ra, disp_pc is opcode=0x39 & ra & disp_pc { Bcc(ra, Z, disp_pc); }
-:BGE  ra, disp_pc is opcode=0x3e & ra & disp_pc { Bcc(ra, !N, disp_pc); }
-:BGT  ra, disp_pc is opcode=0x3f & ra & disp_pc { Bcc(ra, !N && !Z, disp_pc); }
-:BLBC ra, disp_pc is opcode=0x38 & ra & disp_pc { Bexpr(ra, ra:1 ^ 1, disp_pc); }
-:BLBS ra, disp_pc is opcode=0x3c & ra & disp_pc { Bexpr(ra, ra:1 & 1, disp_pc); }
-:BLE  ra, disp_pc is opcode=0x3b & ra & disp_pc { Bcc(ra, N || Z, disp_pc); }
-:BLT  ra, disp_pc is opcode=0x3a & ra & disp_pc { Bcc(ra, N, disp_pc); }
-:BNE  ra, disp_pc is opcode=0x3d & ra & disp_pc { Bcc(ra, !Z, disp_pc); }
+:BLBC  ra, disp_pc is bcode=0x3 & is_f=1 & ccode=0 & ra & disp_pc { Bexpr(ra, ra:1 ^ 1, disp_pc); }
+:BLBS  ra, disp_pc is bcode=0x3 & is_f=1 & ccode=4 & ra & disp_pc { Bexpr(ra, ra:1 & 1, disp_pc); }
+:B^icc ra, disp_pc is bcode=0x3 & is_f=0 & icc & ra & disp_pc { if (icc) goto disp_pc; }
 
 # jumps
 :JMP ra,(rb),hint is opcode=0x1a & jop = 0 & ra & rb & hint { ra = inst_next; goto [rb]; }
@@ -250,14 +250,14 @@ macro cmov(condition,reg,val) {
 }
 
 # conditional move
-:CMOVEQ  ra, op, rc is opcode=0x11 & ofunc=0x24 & ra & op & rc  { iflags(ra); cmov(Z,rc,op); }
-:CMOVGE  ra, op, rc is opcode=0x11 & ofunc=0x46 & ra & op & rc  { iflags(ra); cmov(!N,rc,op); }
-:CMOVGT  ra, op, rc is opcode=0x11 & ofunc=0x66 & ra & op & rc  { iflags(ra); cmov(!Z && !N,rc,op); }
+:CMOVEQ  ra, op, rc is opcode=0x11 & ofunc=0x24 & ra & op & rc  { iflags(ra); cmov(Z_F,rc,op); }
+:CMOVGE  ra, op, rc is opcode=0x11 & ofunc=0x46 & ra & op & rc  { iflags(ra); cmov(!N_F,rc,op); }
+:CMOVGT  ra, op, rc is opcode=0x11 & ofunc=0x66 & ra & op & rc  { iflags(ra); cmov(!(Z_F || N_F),rc,op); }
 :CMOVLBC ra, op, rc is opcode=0x11 & ofunc=0x16 & ra & op & rc  { iflags(ra); cmov((ra:1 ^ 0x1),rc,op); }
 :CMOVLBS ra, op, rc is opcode=0x11 & ofunc=0x14 & ra & op & rc  { iflags(ra); cmov((ra:1 & 0x1),rc,op); }
-:CMOVLE  ra, op, rc is opcode=0x11 & ofunc=0x64 & ra & op & rc  { iflags(ra); cmov(Z || N,rc,op); }
-:CMOVLT  ra, op, rc is opcode=0x11 & ofunc=0x44 & ra & op & rc  { iflags(ra); cmov(N,rc,op); }
-:CMOVNE  ra, op, rc is opcode=0x11 & ofunc=0x26 & ra & op & rc  { iflags(ra); cmov(!Z,rc,op); }
+:CMOVLE  ra, op, rc is opcode=0x11 & ofunc=0x64 & ra & op & rc  { iflags(ra); cmov(Z_F || N_F,rc,op); }
+:CMOVLT  ra, op, rc is opcode=0x11 & ofunc=0x44 & ra & op & rc  { iflags(ra); cmov(N_F,rc,op); }
+:CMOVNE  ra, op, rc is opcode=0x11 & ofunc=0x26 & ra & op & rc  { iflags(ra); cmov(!Z_F,rc,op); }
 
 # shift logical
 :SLL ra, op, rc is opcode=0x12 & ofunc=0x39 & ra & op & rc { rc = ra << op[0,5]; }
@@ -324,12 +324,7 @@ macro cmov(condition,reg,val) {
 :STT fa, disp_regb is opcode=0x27 & fa & disp_regb { *:8 disp_regb = fa; }
 
 # Branch Format Floating-Point Instructions
-:FBEQ fa, disp_pc is opcode=0x31 & fa & disp_pc { FBcc(fa, Z, disp_pc); }
-:FBGE fa, disp_pc is opcode=0x36 & fa & disp_pc { FBcc(fa, !N, disp_pc); }
-:FBGT fa, disp_pc is opcode=0x37 & fa & disp_pc { FBcc(fa, !N && !Z, disp_pc); }
-:FBLE fa, disp_pc is opcode=0x33 & fa & disp_pc { FBcc(fa, N || Z, disp_pc); }
-:FBLT fa, disp_pc is opcode=0x32 & fa & disp_pc { FBcc(fa, N, disp_pc); }
-:FBNE fa, disp_pc is opcode=0x35 & fa & disp_pc { FBcc(fa, !Z, disp_pc); }
+:FB^fcc fa, disp_pc is bcode=0x3 & fcc & fa & disp_pc { if (fcc) goto disp_pc; }
 
 #=========================================================================
 # Miscellaneous Instructions
