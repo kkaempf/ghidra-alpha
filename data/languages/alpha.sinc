@@ -256,11 +256,11 @@ macro cmov(condition,reg,val) {
 
 # conditional move
 :CMOVEQ  ra, op, rc is opcode=0x11 & ofunc=0x24 & ra & op & rc  { cmov(ra == 0,rc,op); }
-:CMOVGE  ra, op, rc is opcode=0x11 & ofunc=0x46 & ra & op & rc  { cmov(ra s> -1,rc,op); }
+:CMOVGE  ra, op, rc is opcode=0x11 & ofunc=0x46 & ra & op & rc  { cmov(ra s>= 0,rc,op); }
 :CMOVGT  ra, op, rc is opcode=0x11 & ofunc=0x66 & ra & op & rc  { cmov(ra s> 0,rc,op); }
 :CMOVLBC ra, op, rc is opcode=0x11 & ofunc=0x16 & ra & op & rc  { cmov((ra:1 ^ 0x1),rc,op); }
 :CMOVLBS ra, op, rc is opcode=0x11 & ofunc=0x14 & ra & op & rc  { cmov((ra:1 & 0x1),rc,op); }
-:CMOVLE  ra, op, rc is opcode=0x11 & ofunc=0x64 & ra & op & rc  { cmov(ra s< 1,rc,op); }
+:CMOVLE  ra, op, rc is opcode=0x11 & ofunc=0x64 & ra & op & rc  { cmov(ra s<= 0,rc,op); }
 :CMOVLT  ra, op, rc is opcode=0x11 & ofunc=0x44 & ra & op & rc  { cmov(ra s< 0,rc,op); }
 :CMOVNE  ra, op, rc is opcode=0x11 & ofunc=0x26 & ra & op & rc  { cmov(ra != 0,rc,op); }
 
