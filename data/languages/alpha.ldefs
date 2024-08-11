@@ -40,4 +40,30 @@
     <compiler name="default" spec="alpha.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>
+  <language processor="Alpha"
+            endian="little"
+            size="64"
+            variant="21364 (EV7)"
+            version="1.0"
+            slafile="21364.sla"
+            processorspec="alpha.pspec"
+            manualindexfile="../manuals/alpha.idx"
+            id="21264:LE:64:default">
+    <description>DEC Alpha 21364 (EV7)</description>
+    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <external_name tool="gnu" name="alpha"/>
+  </language>
+  <language processor="Alpha"
+            endian="little"
+            size="64"
+            variant="21464 (EV8)"
+            version="1.0"
+            slafile="21464.sla"
+            processorspec="alpha.pspec"
+            manualindexfile="../manuals/alpha.idx"
+            id="21264:LE:64:default">
+    <description>DEC Alpha 21464 (EV8)</description>
+    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <external_name tool="gnu" name="alpha"/>
+  </language>
 </language_definitions>
