@@ -335,17 +335,60 @@ macro cmov(condition,reg,val) {
 # Miscellaneous Instructions
 #=========================================================================
 
-# required PALcode opcodes for all implementations
-:HALT         is opcode=0x00 & pal=0 unimpl
-:DRAINA       is opcode=0x00 & pal=2 unimpl
-:IMB          is opcode=0x00 & pal=0x86 unimpl
+define pcodeop nop;
+
+:AMASK op, rc is opcode=0x11 & ofunc=0x61 & op & rc { rc = op; }
 
 # PAL
-:CALL_PAL pal is opcode=0x00 & pal unimpl
+:CALL_PAL pal is opcode=0x00 & pal { nop(); }
 
 # Opcodes reserved to PALcode
-:PAL19    pal is opcode=0x19 & pal unimpl
-:PAL1B    pal is opcode=0x1b & pal unimpl
-:PAL1D    pal is opcode=0x1d & pal unimpl
-:PAL1E    pal is opcode=0x1e & pal unimpl
-:PAL1F    pal is opcode=0x1f & pal unimpl
+:PAL19    pal is opcode=0x19 & pal { nop(); }
+:PAL1B    pal is opcode=0x1b & pal { nop(); }
+:PAL1D    pal is opcode=0x1d & pal { nop(); }
+:PAL1E    pal is opcode=0x1e & pal { nop(); }
+:PAL1F    pal is opcode=0x1f & pal { nop(); }
+
+# cache hints
+:ECB (rb) is opcode=0x18 & mfunc=0xe800 & rb { nop(); }
+:EXCB     is opcode=0x18 & mfunc=0x0400 { nop();  }
+:FETCH    is opcode=0x18 & mfunc=0x8000 { nop(); }
+:FETCH_M  is opcode=0x18 & mfunc=0xa000 { nop(); }
+
+# processor family
+@if defined(21064)
+:IMPLVER rc is opcode=0x11 & ofunc=0x6c & ra=31 & rc { rc = 0; }
+@endif
+@if defined(21164)
+:IMPLVER rc is opcode=0x11 & ofunc=0x6c & ra=31 & rc { rc = 1; }
+@endif
+@if defined(21264)
+:IMPLVER rc is opcode=0x11 & ofunc=0x6c & ra=31 & rc { rc = 2; }
+@endif
+@if defined(21364)
+:IMPLVER rc is opcode=0x11 & ofunc=0x6c & ra=31 & rc { rc = 3; }
+@endif
+@if defined(21464)
+:IMPLVER rc is opcode=0x11 & ofunc=0x6c & ra=31 & rc { rc = 4; }
+@endif
+
+# memory barrier
+:MB is opcode=0x18 & mfunc=0x4000 { nop(); }
+
+# get cylce counter
+define pcodeop random;
+:RPCC ra is opcode=0x18 & mfunc=0xc000 & ra { ra = random(); }
+
+# trap barrier
+:TRAPB is opcode=0x18 & mfunc=0x0000 { nop(); }
+
+# write hint
+:WH64 (rb)   is opcode=0x18 & mfunc=0xf800 & rb { nop(); }
+:WH64EN (rb) is opcode=0x18 & mfunc=0xfc00 & rb { nop(); }
+
+# write memory barrier
+:WMB is opcode=0x18 & mfunc=0x4400 { nop(); }
+
+# VAX compatibility instructions
+:RC ra is opcode=0x18 & mfunc=0xe000 & ra { nop(); }
+:RS ra is opcode=0x18 & mfunc=0xf000 & ra { nop(); }
