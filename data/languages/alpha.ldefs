@@ -11,7 +11,7 @@
             manualindexfile="../manuals/alpha.idx"
             id="21064:LE:64:vms">
     <description>DEC Alpha 21064, 21064A, 21066, 21066A, 21068 (EV4/EV45/LCA/LCA45 chips) with OpenVMS</description>
-    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <compiler name="default" spec="alphavms.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>
   <language processor="Alpha"
@@ -24,7 +24,7 @@
             manualindexfile="../manuals/alpha.idx"
             id="21064:LE:64:unix">
     <description>DEC Alpha 21064, 21064A, 21066, 21066A, 21068 (EV4/EV45/LCA/LCA45 chips) with Digital Unix</description>
-    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <compiler name="default" spec="alphaunix.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>
   <language processor="Alpha"
@@ -37,7 +37,7 @@
             manualindexfile="../manuals/alpha.idx"
             id="21164:LE:64:vms">
     <description>DEC Alpha 21164 (EV5) with OpenVMS</description>
-    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <compiler name="default" spec="alphavms.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>
   <language processor="Alpha"
@@ -50,7 +50,7 @@
             manualindexfile="../manuals/alpha.idx"
             id="21164:LE:64:unix">
     <description>DEC Alpha 21164 (EV5) with Digital Unix</description>
-    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <compiler name="default" spec="alphaunix.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>
   <language processor="Alpha"
@@ -63,7 +63,7 @@
             manualindexfile="../manuals/alpha.idx"
             id="21264:LE:64:vms">
     <description>DEC Alpha 21164A (EV56), 21164PC (PCA56), 21264 (EV6) with OpenVMS</description>
-    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <compiler name="default" spec="alphavms.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>
   <language processor="Alpha"
@@ -76,7 +76,7 @@
             manualindexfile="../manuals/alpha.idx"
             id="21264:LE:64:unix">
     <description>DEC Alpha 21164A (EV56), 21164PC (PCA56), 21264 (EV6) with Digital Unix</description>
-    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <compiler name="default" spec="alphaunix.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>
   <language processor="Alpha"
@@ -89,7 +89,7 @@
             manualindexfile="../manuals/alpha.idx"
             id="21364:LE:64:vms">
     <description>DEC Alpha 21364 (EV7) with OpenVMS</description>
-    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <compiler name="default" spec="alphavms.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>
   <language processor="Alpha"
@@ -102,7 +102,7 @@
             manualindexfile="../manuals/alpha.idx"
             id="21364:LE:64:unix">
     <description>DEC Alpha 21364 (EV7) with Digital Unix</description>
-    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <compiler name="default" spec="alphaunix.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>
   <language processor="Alpha"
@@ -115,7 +115,7 @@
             manualindexfile="../manuals/alpha.idx"
             id="21464:LE:64:vms">
     <description>DEC Alpha 21464 (EV8) with OpenVMS</description>
-    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <compiler name="default" spec="alphavms.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>
   <language processor="Alpha"
@@ -128,7 +128,7 @@
             manualindexfile="../manuals/alpha.idx"
             id="21464:LE:64:unix">
     <description>DEC Alpha 21464 (EV8) with Digital Unix</description>
-    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <compiler name="default" spec="alphaunix.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>
 </language_definitions>
