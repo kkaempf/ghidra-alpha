@@ -110,7 +110,6 @@ icc: "GE" is ccode=6 & is_i = 1 & ra { tmp:1 = (ra s>= 0); export tmp; }
 icc: "GT" is ccode=7 & is_i = 1 & ra { tmp:1 = (ra s> 0); export tmp; }
 
 # float condition codes (for branch)
-# fixme
 fcc: "EQ" is ccode=1 & is_i = 0 & fa { tmp:1 = (fa f== 0); export tmp; }
 fcc: "LT" is ccode=2 & is_i = 0 & fa { tmp:1 = (fa f< 0); export tmp; }
 fcc: "LE" is ccode=3 & is_i = 0 & fa { tmp:1 = (fa f<= 0); export tmp; }
@@ -248,10 +247,10 @@ macro cmov(condition,reg,val) {
 
 # shift logical
 :SLL ra, op, rc is opcode=0x12 & ofunc=0x39 & ra & op & rc { rc = ra << op[0,5]; }
-:SRL ra, op, rc is opcode=0x12 & ofunc=0x34 & ra & op & rc { rc = ra >> op[0,5]; } #FIXME
+:SRL ra, op, rc is opcode=0x12 & ofunc=0x34 & ra & op & rc { rc = ra >> op[0,5]; }
 
 # shift arithmetic
-:SRA ra, op, rc is opcode=0x12 & ofunc=0x3c & ra & op & rc { rc = ra >> op[0,5]; }
+:SRA ra, op, rc is opcode=0x12 & ofunc=0x3c & ra & op & rc { rc = ra s>> op[0,5]; }
 
 #=========================================================================
 # Byte Manipulation Instructions
