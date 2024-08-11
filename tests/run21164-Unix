@@ -2,19 +2,5 @@
 #
 # test.sh <hex>
 echo -n "Testing" $@
-echo " on 21164"
-TMPDIR="."
-for i in $@; do \
-  echo -n "$i "; \
-  j=$(basename $i .hex); \
-  hex=$(tr -d " \n" < $i); \
-  asm=$j.out; \
-  $(sleigh-lift disassemble 21164UNIX.sla $hex > $asm); \
-  diff -wu $j.asm $asm; \
-  if [ $? -ne 0 ]; then \
-    echo "fail"; \
-    break; \
-  else \
-    echo "pass"; \
-  fi;
-done
+echo " on 21164 Unix"
+SLA=21164UNIX.sla ./runtest $@

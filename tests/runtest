@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# test.sh <hex>
+TMPDIR="."
+for i in $@; do \
+  echo -n "$i "; \
+  j=$(basename $i .hex); \
+  hex=$(grep -v ^\# $i | tr -d " \n"); \
+  asm=$j.out; \
+  $(sleigh-lift disassemble $SLA $hex > $asm); \
+  diff -wu $j.asm $asm; \
+  if [ $? -ne 0 ]; then \
+    echo "fail"; \
+    break; \
+  else \
+    echo "pass"; \
+  fi;
+done
