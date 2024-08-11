@@ -45,7 +45,7 @@
             size="64"
             variant="21164 (Unix)"
             version="1.0"
-            slafile="21164.sla"
+            slafile="21164UNIX.sla"
             processorspec="alpha.pspec"
             manualindexfile="../manuals/alpha.idx"
             id="21164:LE:64:unix">
