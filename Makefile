@@ -1,10 +1,16 @@
-all: data/languages/21064.sla data/languages/21164.sla data/languages/21264.sla test
+all: data/languages/21064VMS.sla data/languages/21064UNIX.sla data/languages/21164VMS.sla data/languages/21164UNIX.sla data/languages/21264VMS.sla data/languages/21264UNIX.sla test
 
-data/languages/21064.sla: data/languages/21064.slaspec data/languages/alpha.sinc
+data/languages/21064VMS.sla: data/languages/21064VMS.slaspec data/languages/alpha.sinc
 
-data/languages/21164.sla: data/languages/21164.slaspec data/languages/alpha.sinc
+data/languages/21064UNIX.sla: data/languages/21064UNIX.slaspec data/languages/alpha.sinc
 
-data/languages/21264.sla: data/languages/21264.slaspec data/languages/alpha.sinc
+data/languages/21164VMS.sla: data/languages/21164VMS.slaspec data/languages/alpha.sinc
+
+data/languages/21164UNIX.sla: data/languages/21164UNIX.slaspec data/languages/alpha.sinc
+
+data/languages/21264VMS.sla: data/languages/21264VMS.slaspec data/languages/alpha.sinc
+
+data/languages/21264UNIX.sla: data/languages/21264UNIX.slaspec data/languages/alpha.sinc
 
 %.sla: %.slaspec
 	/abuild/projects/Ghidra/ghidra/Ghidra/Features/Decompiler/src/decompile/cpp/sleigh_dbg $<

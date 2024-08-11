@@ -4,65 +4,130 @@
   <language processor="Alpha"
             endian="little"
             size="64"
-            variant="21064 (EV4, EV45)"
+            variant="21064 (VMS)"
             version="1.0"
-            slafile="21064.sla"
+            slafile="21064VMS.sla"
             processorspec="alpha.pspec"
             manualindexfile="../manuals/alpha.idx"
-            id="21064:LE:64:default">
-    <description>DEC Alpha 21064, 21064A, 21066, 21066A, 21068 (EV4/EV45/LCA/LCA45 chips)</description>
+            id="21064:LE:64:vms">
+    <description>DEC Alpha 21064, 21064A, 21066, 21066A, 21068 (EV4/EV45/LCA/LCA45 chips) with OpenVMS</description>
     <compiler name="default" spec="alpha.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>
   <language processor="Alpha"
             endian="little"
             size="64"
-            variant="21164 (EV5)"
+            variant="21064 (Unix)"
+            version="1.0"
+            slafile="21064UNIX.sla"
+            processorspec="alpha.pspec"
+            manualindexfile="../manuals/alpha.idx"
+            id="21064:LE:64:unix">
+    <description>DEC Alpha 21064, 21064A, 21066, 21066A, 21068 (EV4/EV45/LCA/LCA45 chips) with Digital Unix</description>
+    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <external_name tool="gnu" name="alpha"/>
+  </language>
+  <language processor="Alpha"
+            endian="little"
+            size="64"
+            variant="21164 (VMS)"
+            version="1.0"
+            slafile="21164VMS.sla"
+            processorspec="alpha.pspec"
+            manualindexfile="../manuals/alpha.idx"
+            id="21164:LE:64:vms">
+    <description>DEC Alpha 21164 (EV5) with OpenVMS</description>
+    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <external_name tool="gnu" name="alpha"/>
+  </language>
+  <language processor="Alpha"
+            endian="little"
+            size="64"
+            variant="21164 (Unix)"
             version="1.0"
             slafile="21164.sla"
             processorspec="alpha.pspec"
             manualindexfile="../manuals/alpha.idx"
-            id="21164:LE:64:default">
-    <description>DEC Alpha 21164 (EV5)</description>
+            id="21164:LE:64:unix">
+    <description>DEC Alpha 21164 (EV5) with Digital Unix</description>
     <compiler name="default" spec="alpha.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>
   <language processor="Alpha"
             endian="little"
             size="64"
-            variant="21264 (EV6)"
+            variant="21264 (VMS)"
             version="1.0"
-            slafile="21264.sla"
+            slafile="21264VMS.sla"
             processorspec="alpha.pspec"
             manualindexfile="../manuals/alpha.idx"
-            id="21264:LE:64:default">
-    <description>DEC Alpha 21164A (EV56), 21164PC (PCA56), 21264 (EV6)</description>
+            id="21264:LE:64:vms">
+    <description>DEC Alpha 21164A (EV56), 21164PC (PCA56), 21264 (EV6) with OpenVMS</description>
     <compiler name="default" spec="alpha.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>
   <language processor="Alpha"
             endian="little"
             size="64"
-            variant="21364 (EV7)"
+            variant="21264 (Unix)"
             version="1.0"
-            slafile="21364.sla"
+            slafile="21264UNIX.sla"
             processorspec="alpha.pspec"
             manualindexfile="../manuals/alpha.idx"
-            id="21264:LE:64:default">
-    <description>DEC Alpha 21364 (EV7)</description>
+            id="21264:LE:64:unix">
+    <description>DEC Alpha 21164A (EV56), 21164PC (PCA56), 21264 (EV6) with Digital Unix</description>
     <compiler name="default" spec="alpha.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>
   <language processor="Alpha"
             endian="little"
             size="64"
-            variant="21464 (EV8)"
+            variant="21364 (VMS)"
             version="1.0"
-            slafile="21464.sla"
+            slafile="21364VMS.sla"
             processorspec="alpha.pspec"
             manualindexfile="../manuals/alpha.idx"
-            id="21264:LE:64:default">
-    <description>DEC Alpha 21464 (EV8)</description>
+            id="21364:LE:64:vms">
+    <description>DEC Alpha 21364 (EV7) with OpenVMS</description>
+    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <external_name tool="gnu" name="alpha"/>
+  </language>
+  <language processor="Alpha"
+            endian="little"
+            size="64"
+            variant="21364 (Unix)"
+            version="1.0"
+            slafile="21364UNIX.sla"
+            processorspec="alpha.pspec"
+            manualindexfile="../manuals/alpha.idx"
+            id="21364:LE:64:unix">
+    <description>DEC Alpha 21364 (EV7) with Digital Unix</description>
+    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <external_name tool="gnu" name="alpha"/>
+  </language>
+  <language processor="Alpha"
+            endian="little"
+            size="64"
+            variant="21464 (VMS)"
+            version="1.0"
+            slafile="21464VMS.sla"
+            processorspec="alpha.pspec"
+            manualindexfile="../manuals/alpha.idx"
+            id="21464:LE:64:vms">
+    <description>DEC Alpha 21464 (EV8) with OpenVMS</description>
+    <compiler name="default" spec="alpha.cspec" id="default"/>
+    <external_name tool="gnu" name="alpha"/>
+  </language>
+  <language processor="Alpha"
+            endian="little"
+            size="64"
+            variant="21464 (Unix)"
+            version="1.0"
+            slafile="21464UNIX.sla"
+            processorspec="alpha.pspec"
+            manualindexfile="../manuals/alpha.idx"
+            id="21464:LE:64:unix">
+    <description>DEC Alpha 21464 (EV8) with Digital Unix</description>
     <compiler name="default" spec="alpha.cspec" id="default"/>
     <external_name tool="gnu" name="alpha"/>
   </language>

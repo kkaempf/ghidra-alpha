@@ -2,14 +2,14 @@
 #
 # test.sh <hex>
 echo -n "Testing" $@
-echo " on 21064"
+echo " on 21264"
 TMPDIR="."
 for i in $@; do \
   echo -n "$i "; \
   j=$(basename $i .hex); \
   hex=$(tr -d " \n" < $i); \
   asm=$j.out; \
-  $(sleigh-lift disassemble 21064.sla $hex > $asm); \
+  $(sleigh-lift disassemble 21264VMS.sla $hex > $asm); \
   diff -wu $j.asm $asm; \
   if [ $? -ne 0 ]; then \
     echo "fail"; \

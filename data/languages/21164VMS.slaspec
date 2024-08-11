@@ -1,3 +1,4 @@
 @define 21164 ""
+@define VMS ""
 
 @include "alpha.sinc"
