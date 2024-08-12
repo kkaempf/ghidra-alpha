@@ -33,101 +33,101 @@
     <prototype name="__stdcall" extrapop="unknown" stackshift="8" strategy="register">
       <input pointermax="8">
         <pentry minsize="1" maxsize="8" align="8">
-          <register name="R16"/>
+          <register name="a0"/>
         </pentry>
         <pentry minsize="1" maxsize="8" align="8">
-          <register name="R17"/>
+          <register name="a1"/>
         </pentry>
         <pentry minsize="1" maxsize="8" align="8">
-          <register name="R18"/>
+          <register name="a2"/>
         </pentry>
         <pentry minsize="1" maxsize="8" align="8">
-          <register name="R19"/>
+          <register name="a3"/>
         </pentry>
         <pentry minsize="1" maxsize="8" align="8">
-          <register name="R20"/>
+          <register name="a4"/>
         </pentry>
         <pentry minsize="1" maxsize="8" align="8">
-          <register name="R21"/>
+          <register name="a5"/>
         </pentry>
         <pentry minsize="1" maxsize="8" align="8">
-          <register name="F16"/>
+          <register name="f16"/>
         </pentry>
         <pentry minsize="1" maxsize="8" align="8">
-          <register name="F17"/>
+          <register name="f17"/>
         </pentry>
         <pentry minsize="1" maxsize="8" align="8">
-          <register name="F18"/>
+          <register name="f18"/>
         </pentry>
         <pentry minsize="1" maxsize="8" align="8">
-          <register name="F19"/>
+          <register name="f19"/>
         </pentry>
         <pentry minsize="1" maxsize="8" align="8">
-          <register name="F20"/>
+          <register name="f20"/>
         </pentry>
         <pentry minsize="1" maxsize="8" align="8">
-          <register name="F21"/>
+          <register name="f21"/>
         </pentry>
       </input>
       <output>
         <pentry minsize="1" maxsize="8">
-          <register name="R0"/>
+          <register name="v0"/>
         </pentry>
         <pentry minsize="1" maxsize="8">
-          <register name="F0"/>
+          <register name="f0"/>
         </pentry>
         <pentry minsize="1" maxsize="8">
-          <register name="F1"/>
+          <register name="f1"/>
         </pentry>
       </output>
       <unaffected>
-        <register name="R9"/>
-        <register name="R10"/>
-        <register name="R11"/>
-        <register name="R12"/>
-        <register name="R13"/>
-        <register name="R14"/>
+        <register name="s0"/>
+        <register name="s1"/>
+        <register name="s2"/>
+        <register name="s3"/>
+        <register name="s4"/>
+        <register name="s5"/>
         <register name="FP"/>
-        <register name="F2"/>
-        <register name="F3"/>
-        <register name="F4"/>
-        <register name="F5"/>
-        <register name="F6"/>
-        <register name="F7"/>
-        <register name="F8"/>
-        <register name="F9"/>
+        <register name="f2"/>
+        <register name="f3"/>
+        <register name="f4"/>
+        <register name="f5"/>
+        <register name="f6"/>
+        <register name="f7"/>
+        <register name="f8"/>
+        <register name="f9"/>
       </unaffected>
       <killedbycall>
-        <register name="R1"/>
-        <register name="R2"/>
-        <register name="R3"/>
-        <register name="R4"/>
-        <register name="R5"/>
-        <register name="R6"/>
-        <register name="R7"/>
-        <register name="R8"/>
-        <register name="R22"/>
-        <register name="R23"/>
-        <register name="R24"/>
-        <register name="R25"/>
-        <register name="PV"/>
-        <register name="R28"/>
+        <register name="t0"/>
+        <register name="t1"/>
+        <register name="t2"/>
+        <register name="t3"/>
+        <register name="t4"/>
+        <register name="t5"/>
+        <register name="t6"/>
+        <register name="t7"/>
+        <register name="t8"/>
+        <register name="t9"/>
+        <register name="t10"/>
+        <register name="t11"/>
+        <register name="pv"/>
+        <register name="at"/>
         <register name="GP"/>
-        <register name="F10"/>
-        <register name="F11"/>
-        <register name="F12"/>
-        <register name="F13"/>
-        <register name="F14"/>
-        <register name="F15"/>
-        <register name="F22"/>
-        <register name="F23"/>
-        <register name="F24"/>
-        <register name="F25"/>
-        <register name="F26"/>
-        <register name="F27"/>
-        <register name="F28"/>
-        <register name="F28"/>
-        <register name="F30"/>
+        <register name="f10"/>
+        <register name="f11"/>
+        <register name="f12"/>
+        <register name="f13"/>
+        <register name="f14"/>
+        <register name="f15"/>
+        <register name="f22"/>
+        <register name="f23"/>
+        <register name="f24"/>
+        <register name="f25"/>
+        <register name="f26"/>
+        <register name="f27"/>
+        <register name="f28"/>
+        <register name="f29"/>
+        <register name="f30"/>
       </killedbycall>
     </prototype>
   </default_proto>
