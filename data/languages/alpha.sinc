@@ -346,8 +346,9 @@ macro cmov(condition,reg,val) {
 :SEXTW op, Rc_lhs is opcode=0x1c & ofunc=0x01 & rega=31 & op & Rc_lhs { Rc_lhs = sext(op:2); }
 
 # zero bytes
-:ZAP    Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x30 & Ra & op & Rc_lhs unimpl
-:ZAPNOT Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x31 & Ra & op & Rc_lhs unimpl
+define pcodeop zero_bytes;
+:ZAP    Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x30 & Ra & op & Rc_lhs { zero_bytes(); }
+:ZAPNOT Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x31 & Ra & op & Rc_lhs { zero_bytes(); }
 
 #=========================================================================
 # Floating-Point Instructions
