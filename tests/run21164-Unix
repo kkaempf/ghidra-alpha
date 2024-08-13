@@ -1,6 +1,0 @@
-#!/bin/sh
-#
-# test.sh <hex>
-echo -n "Testing" $@
-echo " on 21164 Unix"
-SLA=21164UNIX.sla ./runtest $@

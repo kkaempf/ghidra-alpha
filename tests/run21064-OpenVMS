@@ -1,6 +1,0 @@
-#!/bin/sh
-#
-# test.sh <hex>
-echo -n "Testing" $@
-echo " on 21064 OpenVMS"
-SLA=21064VMS.sla ./runtest $@
