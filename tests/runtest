@@ -23,5 +23,6 @@ for i in $@; do
     break;
   else
     echo "pass";
+    rm $out;
   fi;
 done
