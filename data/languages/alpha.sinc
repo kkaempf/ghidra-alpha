@@ -130,11 +130,9 @@ Fa: rega is rega { export rega; }
 Fa: FZ is rega=31 & FZ { export  0:8; }
 Ra: RZ is rega=31 & RZ { export  0:8; }
 Rb: RZ is regb=31 & RZ { export  0:8; }
-Rc: RZ is regc=31 & RZ { export  0:8; }
 @else
 Ra: zero is rega=31 & zero   { export 0:8; }
 Rb: zero is regb=31 & zero   { export 0:8; }
-Rc: zero is regc=31 & zero   { export 0:8; }
 Fa: fzero is rega=31 & fzero { export  0:8; }
 @endif
 
@@ -146,10 +144,10 @@ disp_regb: mdisp(Rb)  is mdisp & Rb { ptr:8 = Rb + sext(mdisp:2); export ptr; }
 hdisp_regb: mdisp(Rb) is mdisp & Rb { ptr:8 = Rb + sext(mdisp:2)*65536; export ptr; }
 
 # PC relative displacement
-disp_pc: loc is bdisp [ loc = inst_start + 4 + (bdisp << 2); ] { export *[ram]:8 loc; }
+disp_pc: loc is bdisp [ loc = inst_next + (bdisp << 2); ] { export *[ram]:8 loc; }
 
 # jump hint
-hint: jdisp is jdisp { ptr:8 = sext(jdisp:2)*4; export *[ram]:8 ptr; }
+hint:    loc is jdisp [ loc = inst_next + (jdisp << 2); ] { export *[ram]:8 loc; }
 
 # arith operand
 op: lit is lit & is_lit = 1 { export *[const]:8 lit; }
@@ -215,13 +213,15 @@ fcc: "GT" is ccode=7 & is_i = 0 & Fa { tmp:1 = (Fa f> 0); export tmp; }
 #=========================================================================
 
 # PC-relative branch
-:BR   Ra_lhs, disp_pc is opcode=0x30 & Ra_lhs & disp_pc { Ra_lhs = inst_next; goto [disp_pc]; }
-:BSR  Ra_lhs, disp_pc is opcode=0x34 & Ra_lhs & disp_pc { Ra_lhs = inst_next; call [disp_pc]; }
+:BR           disp_pc is opcode=0x30 & rega=31 & disp_pc {                     goto disp_pc; }
+:BR   Ra_lhs, disp_pc is opcode=0x30 & Ra_lhs  & disp_pc { Ra_lhs = inst_next; goto disp_pc; }
+:BSR          disp_pc is opcode=0x34 & rega=31 & disp_pc {                     call disp_pc; }
+:BSR  Ra_lhs, disp_pc is opcode=0x34 & Ra_lhs  & disp_pc { Ra_lhs = inst_next; call disp_pc; }
 
 # PC-relative branch conditional
 :BLBC  Ra, disp_pc is bcode=0x3 & is_i=1 & ccode=0 & Ra & disp_pc { Bexpr(Ra, Ra:1 ^ 1, disp_pc); }
 :BLBS  Ra, disp_pc is bcode=0x3 & is_i=1 & ccode=4 & Ra & disp_pc { Bexpr(Ra, Ra:1 & 1, disp_pc); }
-:B^icc Ra, disp_pc is bcode=0x3 & is_i=1 & icc & Ra & disp_pc { if (icc) goto disp_pc; }
+:B^icc Ra, disp_pc is bcode=0x3 & is_i=1 & icc     & Ra & disp_pc { if (icc) goto disp_pc; }
 
 # jumps
 :JMP           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 0 & Ra_lhs & Rb & hint { Ra_lhs = inst_next; goto [Rb]; }
