@@ -138,6 +138,8 @@ Fa: fzero is rega=31 & fzero { export  0:8; }
 
 # LDAx
 
+#  LDA Ra, disp(31) -> LDA Ra, disp
+disp_regz: mdisp      is mdisp & regb=31 { ptr:8 = sext(mdisp:2); export ptr; }
 #  LDA Ra, disp(Rb)
 disp_regb: mdisp(Rb)  is mdisp & Rb { ptr:8 = Rb + sext(mdisp:2); export ptr; }
 #  LDAH Ra, 32767(Rb)
@@ -177,6 +179,8 @@ fcc: "GT" is ccode=7 & is_i = 0 & Fa { tmp:1 = (Fa f> 0); export tmp; }
 # Memory Integer Load/Store Instructions
 #=========================================================================
 
+# load constant (== LDA a, disp(R31))
+:LDA  Ra_lhs, disp_regz is opcode=0x08 & Ra_lhs & disp_regz { Ra_lhs = disp_regz; }
 # load address
 :LDA  Ra_lhs, disp_regb is opcode=0x08 & Ra_lhs & disp_regb { Ra_lhs = disp_regb; }
 # load address high
