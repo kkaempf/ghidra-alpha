@@ -32,24 +32,6 @@
   <default_proto>
     <prototype name="__stdcall" extrapop="unknown" stackshift="8" strategy="register">
       <input pointermax="8">
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="a0"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="a1"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="a2"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="a3"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="a4"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="a5"/>
-        </pentry>
         <pentry minsize="1" maxsize="8" align="8" metatype="float">
           <register name="f16"/>
         </pentry>
@@ -68,16 +50,34 @@
         <pentry minsize="1" maxsize="8" align="8" metatype="float">
           <register name="f21"/>
         </pentry>
+        <pentry minsize="1" maxsize="8" align="8">
+          <register name="a0"/>
+        </pentry>
+        <pentry minsize="1" maxsize="8" align="8">
+          <register name="a1"/>
+        </pentry>
+        <pentry minsize="1" maxsize="8" align="8">
+          <register name="a2"/>
+        </pentry>
+        <pentry minsize="1" maxsize="8" align="8">
+          <register name="a3"/>
+        </pentry>
+        <pentry minsize="1" maxsize="8" align="8">
+          <register name="a4"/>
+        </pentry>
+        <pentry minsize="1" maxsize="8" align="8">
+          <register name="a5"/>
+        </pentry>
       </input>
       <output>
-        <pentry minsize="1" maxsize="8">
-          <register name="v0"/>
-        </pentry>
         <pentry minsize="1" maxsize="8" metatype="float">
           <register name="f0"/>
         </pentry>
         <pentry minsize="1" maxsize="8" metatype="float">
           <register name="f1"/>
+        </pentry>
+        <pentry minsize="1" maxsize="8">
+          <register name="v0"/>
         </pentry>
       </output>
       <unaffected>
