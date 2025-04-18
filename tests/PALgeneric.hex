@@ -1,0 +1,7 @@
+# generic PAL instructions
+# DRAINA
+02 00 00 00
+# HALT
+00 00 00 00
+# IMB
+86 00 00 00
