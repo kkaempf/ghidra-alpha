@@ -4,6 +4,8 @@
 #  CPU: 21064, 21164, 21264
 #  OS: NT, UNIX, VMS
 TMPDIR="."
+cd `dirname "$0"`
+SLADIR=$(cd ../data/languages; pwd)
 CPU=$1
 OS=$2
 shift 2
@@ -11,8 +13,8 @@ for i in $@; do
   j=$(basename $i .hex);
   echo -n "$i ";
   hex=$(grep -v ^\# $i | tr -d " \n");
-  out=$j.out;
-  $(sleigh-lift disassemble $CPU$OS.sla $hex > $out);
+  out=$j.out$OS;
+  $(sleigh-lift disassemble $SLADIR/$CPU$OS.sla $hex > $out);
   if [ -f $j.asm$OS ]; then
     diff -wu $j.asm$OS $out;
   else

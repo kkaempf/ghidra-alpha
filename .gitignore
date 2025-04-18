@@ -3,3 +3,6 @@
 *.pdf
 core.*
 *.out
+*.outNT
+*.outUNIX
+*.outVMS
