@@ -46,12 +46,68 @@ define register offset=0x100 size=8 [ f0  f1  f2  f3  f4  f5  f6  f7  f8  f9  f1
                                       f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 fzero ];
 @endif
 
-
 # program counter
 define register offset=0x200 size=8 [ PC ];
 
 # variables
 define register offset=0x208 size=8 [ loc ];
+
+@if defined(21064)
+# 21064 Ibox registers
+define register offset=0x300 size=8 [ TB_TAG ITB_PTE ICCSR   ITB_PTE_TEMP EXC_ADDR SL_RCV ITBZAP  ITBASM
+                                      ITBIS  PS      EXC_SUM PAL_BASE     HIRR     SIRR   ASTRR   Ibox15
+				      HIER   SIER    ASTER   SL_CLR       Ibox20   Ibox21 SL_XMIT Ibox23
+				      Ibox24 Ibox25  Ibox26  Ibox27       Ibox28   Ibox29 Ibox30  Ibox31 ];
+# 21064 Abox registers
+define register offset=0x400 size=8 [ TB_CTL Abox1    WDTB_PTE DTB_PTE_TEMP  MM_CSR  VA        DTBZAP   DTBASM
+                                      DTBIS  BIU_ADDR BIU_STAT Abox11
+@if defined(21064A)
+				                                             C_STAT
+@else
+                                                                             DC_STAT
+@endif
+                                                                                    FILL_ADDR ABOX_CTL ALT_MODE
+                                      CC     CC_CTL   BIU_CTL  FILL_SYNDROME BC_TAG FLUSH_IC  Abox22   FLUSH_IC_ASM
+				      Abox24 Abox25   Abox26   Abox27        Abox28 Abox29    Abox30   Abox31 ];
+@endif
+
+@if defined(21164)
+# internal processor registers (IPRs)
+define register offset=0x300 size=8 [ ISR  ITB_TAG      ITB_PTE        ITB_ASN  ITB_PTE_TEMP ITB_IA    ITB_IAP  ITB_IS
+                                      SIRR ASTRR        ASTER          EXC_ADDR EXC_SUM      EXC_MASK  PAL_BASE ICM
+                                      IPLR INTID        IFAULT_VA_FORM IVPTBR   IPR_114      HWINT_CLR SL_XMIT  SL_RCV
+				      ICSR IC_FLUSH_CTL ICPERR_STAT    IPR_11B  PMCTR ];
+
+define register offset=0x500 size=8 [ DTB_ASNW200E0 DTB_CM  DTB_TAG      DTB_PTE     DTB_PTE_TEMP MM_STAT          VA      VA_FORM
+                                      MVPTBR        DTB_IAP DTB_IA       DTB_IS      ALT_MODE     CC               CC_CTL  MCSR
+				      DC_FLUSH      IPR_211 DC_PERR_STAT DC_TEST_CTL DC_TEST_TAG  DC_TEST_TAG_TEMP DC_MODE MAF_MODE ];
+
+# simulate HW_LD and HW_ST flags as registers
+#	phys   = (15, 15) # hw_ld physical
+#	alt    = (14, 14) # hw_ld alt mode
+#	wrtck  = (13, 13) # hw_ld write check
+#       quad   = (12, 12) # hw_ld quadword
+#	vpte   = (11, 11) # hw_ld virtual pte fetch
+#	lock   = (10, 10) # hw_ld load lock
+#                                     0      1    2     3    4     5     6     7
+define register offset=0x500 size=1 [ _      l    v    lv    q    lq    vq    lvq
+                                      w     wl   wv   wlv   wq   wlq   wvq   wlvq
+				      a     al   av   alv   aq   alq   avq   alvq
+				      aw   awl  awv  awlv  awq  awlq  awvq  awlvq
+                                      p     pl   vp   plv   pq   plq   vpq   plvq
+                                      pw   pwl  pwv  pwlv  pwq  pwlq  pwvq  pwlvq
+				      pa   pal  pav  palv  paq  palq  pavq  palvq
+				      paw pawl pawv pawlv pawq pawlq pawvq pawlvq ];
+
+
+
+#	phys   = (15, 15) # hw_st physical
+#	alt    = (14, 14) # hw_st alt mode
+#	mbz    = (13, 13) # hw_st must be zero
+#       quad   = (12, 12) # hw_st quadword
+#	mbz    = (11, 11) # hw_st must be zero
+#	cond   = (10, 10) # hw_st conditional
+@endif # 21164
 
 #--------------------------------------------------------------------------
 # Macros
@@ -73,20 +129,29 @@ define token inst (32)
         bcode  = (30, 31) # branch code
         is_i   = (29, 29) # int flag for branch
         ccode  = (26, 28) # condition code
-        pal    = ( 0, 25) dec # Palcode
+        pcode  = ( 0, 25) dec # Palcode
         rega   = (21, 25) # Register a
         fa     = (21, 25) # Floating-Point Register a
         bdisp  = ( 0, 20) signed # branch displacement
         regb   = (16, 20) # Register b
         mfunc  = ( 0, 15) # memory format with function code
         mdisp  = ( 0, 15) signed dec # memory displacement
+	ipr    = ( 0, 15) # internal processor register (PAL 19/1D)
         jop    = (14, 15) # jump opcode
         jdisp  = ( 0, 13) signed # jump displacement
         sbz    = (13, 15) # should be zero
+        ldst   = (10, 15) # PAL load/store flags
         lit    = (13, 20) signed dec # literal
         is_lit = (12, 12) # bit 12: 0->SBZ, 1->LIT
         ofunc  = ( 5, 11) # operate function
+	paltmp = ( 7,  7) # 21064 PAL 19/1D ref to PALtemp
+	abx    = ( 6,  6) # 21064 PAL 19/1D ref to Abox
+	ibx    = ( 5,  5) # 21064 PAL 19/1D ref to Ibox
+	pdisp  = ( 0,  9) signed # pal displacement
         regc   = ( 0,  4) # Register c
+	ibox   = ( 0,  4) # 21064 PAL 19/1D Ibox register
+	abox   = ( 0,  4) # 21064 PAL 19/1D Abox register
+	tmpidx = ( 0,  4) dec # 21064 PAL 19/1D PALtemp register
 ;
 
 #--------------------------------------------------------------------------
@@ -106,7 +171,6 @@ attach variables [ fa ]   [ f0  f1  f2  f3  f4  f5  f6  f7  f8  f9  f10 f11 f12 
                             f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 fzero ];
 @endif
 
-
 @if defined(NT)
 # integer registers - Windows NT
 # names according to Alpha Architecture Reference, II-C
@@ -114,6 +178,36 @@ attach variables [ rega regb regc ] [ v0  t0  t1  t2  t3  t4  t5  t6  t7  s0  s1
                                       a0  a1  a2  a3  a4  a5  t8  t9  t10 t11 ra  t12 at  gp  sp  zero ];
 attach variables [ fa ]   [ f0  f1  f2  f3  f4  f5  f6  f7  f8  f9  f10 f11 f12 f13 f14 f15
                             f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 fzero ];
+@endif
+
+@if defined(21064)
+# 21064 Ibox registers
+attach variables [ ibox ] [ TB_TAG ITB_PTE ICCSR   ITB_PTE_TEMP EXC_ADDR SL_RCV ITBZAP  ITBASM
+                            ITBIS  PS      EXC_SUM PAL_BASE     HIRR     SIRR   ASTRR   Ibox15
+			    HIER   SIER    ASTER   SL_CLR       Ibox20   Ibox21 SL_XMIT Ibox23
+			    Ibox24 Ibox25  Ibox26  Ibox27       Ibox28   Ibox29 Ibox30  Ibox31 ];
+# 21064 Abox registers
+attach variables [ abox]  [ TB_CTL Abox1    WDTB_PTE DTB_PTE_TEMP  MM_CSR  VA        DTBZAP   DTBASM
+                            DTBIS  BIU_ADDR BIU_STAT Abox11
+@if defined(21064A)
+			                                           C_STAT
+@else
+                                                                   DC_STAT
+@endif
+                                                                           FILL_ADDR ABOX_CTL ALT_MODE
+                            CC     CC_CTL   BIU_CTL  FILL_SYNDROME BC_TAG  FLUSH_IC  Abox22   FLUSH_IC_ASM
+			    Abox24 Abox25   Abox26   Abox27        Abox28  Abox29    Abox30   Abox31 ];
+@endif
+
+@if defined(21164)
+attach variables [ ldst ] [   _    l    v    lv    q    lq    vq    lvq
+                              w   wl   wv   wlv   wq   wlq   wvq   wlvq
+			      a   al   av   alv   aq   alq   avq   alvq
+			     aw  awl  awv  awlv  awq  awlq  awvq  awlvq
+			      p   pl   vp   plv   pq   plq   vpq   plvq
+			     pw  pwl  pwv  pwlv  pwq  pwlq  pwvq  pwlvq
+			     pa  pal  pav  palv  paq  palq  pavq  palvq
+			    paw pawl pawv pawlv pawq pawlq pawvq pawlvq ];
 @endif
 
 #--------------------------------------------------------------------------
@@ -150,6 +244,9 @@ disp_pc: loc is bdisp [ loc = inst_next + (bdisp << 2); ] { export *[ram]:8 loc;
 
 # jump hint
 hint:    loc is jdisp [ loc = inst_next + (jdisp << 2); ] { export *[ram]:8 loc; }
+
+# PAL 1B displacement
+paldisp: pdisp(Rb) is pdisp & Rb  { ptr:8 = Rb + sext(pdisp:2); export ptr; }
 
 # arith operand
 op: lit is lit & is_lit = 1 { export *[const]:8 lit; }
@@ -381,14 +478,36 @@ define pcodeop nop;
 :AMASK op, Rc_lhs is opcode=0x11 & ofunc=0x61 & op & Rc_lhs { Rc_lhs = op; }
 
 # PAL
-:CALL_PAL pal is opcode=0x00 & pal { nop(); }
+:HALT           is opcode=0x00 & pcode=0    { nop(); }
+:DRAINA         is opcode=0x00 & pcode=2    { nop(); }
+:IMB            is opcode=0x00 & pcode=0x86 { nop(); }
+:CALL_PAL pcode is opcode=0x00 & pcode      { nop(); }
 
-# Opcodes reserved to PALcode
-:PAL19    pal is opcode=0x19 & pal { nop(); }
-:PAL1B    pal is opcode=0x1b & pal { nop(); }
-:PAL1D    pal is opcode=0x1d & pal { nop(); }
-:PAL1E    pal is opcode=0x1e & pal { nop(); }
-:PAL1F    pal is opcode=0x1f & pal { nop(); }
+# 21064: see EC–Q9ZUC–TE pg 95ff
+@if defined(21064)
+# -> Setting the PAL, ABX, and IBX fields to zero generates a NOP.
+:NOP                                                        is opcode=0x19 &                                           paltmp=0 & abx=0 & ibx=0 { nop(); }
+:NOP                                                        is opcode=0x1d &                                           paltmp=0 & abx=0 & ibx=0 { nop(); }
+# move from internal processor register
+:HW_MFPR^"/i"  rega, ibox                                   is opcode=0x19 & rega &        ibox &          rega=regb & paltmp=0 & abx=0 & ibx=1 { rega = ibox; }
+:HW_MFPR^"/a"  rega, abox                                   is opcode=0x19 & rega & abox &                 rega=regb & paltmp=0 & abx=1 & ibx=0 { rega = abox; }
+:HW_MFPR^"/p"  rega, "PAL_TEMP["^tmpidx^"]"                 is opcode=0x19 & rega &               tmpidx & rega=regb & paltmp=1 & abx=0 & ibx=0 { nop(); }
+# move to internal processor register
+:HW_MTPR^"/i"  rega, ibox                                   is opcode=0x1d & rega &        ibox &          rega=regb & paltmp=0 & abx=0 & ibx=1 { ibox = rega; }
+:HW_MTPR^"/a"  rega, abox                                   is opcode=0x1d & rega & abox &                 rega=regb & paltmp=0 & abx=1 & ibx=0 { abox = rega; }
+:HW_MTPR^"/p"  rega, "PAL_TEMP["^tmpidx^"]"                 is opcode=0x1d & rega &               tmpidx & rega=regb & paltmp=1 & abx=0 & ibx=0 { nop(); }
+# move to multiple internal processor registers
+:HW_MTPR^"/ai"  rega, abox^"+"^ibox                         is opcode=0x1d & rega & abox & ibox &          rega=regb & paltmp=0 & abx=1 & ibx=1 { rega = ibox; }
+:HW_MTPR^"/ip"  rega, ibox^"+PAL_TEMP["^tmpidx^"]"          is opcode=0x1d & rega &        ibox & tmpidx & rega=regb & paltmp=1 & abx=0 & ibx=1 { rega = ibox; }
+:HW_MTPR^"/ap"  rega, abox^"+PAL_TEMP["^tmpidx^"]"          is opcode=0x1d & rega & abox &        tmpidx & rega=regb & paltmp=1 & abx=1 & ibx=0 { rega = abox; }
+:HW_MTPR^"/aip" rega, abox^"+"^ibox^"+PAL_TEMP["^tmpidx^"]" is opcode=0x1d & rega & abox & ibox & tmpidx & rega=regb & paltmp=1 & abx=1 & ibx=1 { rega = ibox; }
+@else
+:HW_MTPR    rega is opcode=0x1d & rega { nop(); }
+:HW_MFPR  pcode is opcode=0x19 & pcode { nop(); }
+@endif
+:HW_LD rega,paldisp is opcode=0x1b & rega & paldisp { nop(); }
+:HW_REI   pcode is opcode=0x1e & pcode { nop(); }
+:HW_ST    pcode is opcode=0x1f & pcode { nop(); }
 
 # cache hints
 :ECB (Rb) is opcode=0x18 & mfunc=0xe800 & Rb { nop(); }
