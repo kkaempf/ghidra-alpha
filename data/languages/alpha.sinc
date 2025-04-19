@@ -536,8 +536,8 @@ define pcodeop nop;
 :MB is opcode=0x18 & mfunc=0x4000 { nop(); }
 
 # get cylce counter
-define pcodeop random;
-:RPCC Ra is opcode=0x18 & mfunc=0xc000 & Ra { Ra = random(); }
+define pcodeop cycle_counter;
+:RPCC Ra is opcode=0x18 & mfunc=0xc000 & Ra { Ra = cycle_counter(); }
 
 # trap barrier
 :TRAPB is opcode=0x18 & mfunc=0x0000 { nop(); }
