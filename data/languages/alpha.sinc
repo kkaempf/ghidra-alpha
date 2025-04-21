@@ -325,10 +325,11 @@ fcc: "GT" is ccode=7 & is_i = 0 & Fa { tmp:1 = (Fa f> 0); export tmp; }
 :B^icc Ra, disp_pc is bcode=0x3 & is_i=1 & icc     & Ra & disp_pc { if (icc) goto disp_pc; }
 
 # jumps
-:JMP           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 0 & Ra_lhs & Rb & hint { Ra_lhs = inst_next; goto [Rb]; }
-:JSR           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 1 & Ra_lhs & Rb & hint { Ra_lhs = inst_next; call [Rb]; }
-:RET           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 2 & Ra_lhs & Rb & hint { Ra_lhs = inst_next; goto [Rb]; }
-:JSR_COROUTINE Ra_lhs,(Rb),hint is opcode=0x1a & jop = 3 & Ra_lhs & Rb & hint { Ra_lhs = inst_next; call [Rb]; }
+:JMP           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 0 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; goto [Rb]; }
+:JSR           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 1 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; call [Rb]; }
+:RET           (Rb)             is opcode=0x1a & jop = 2 & rega=31 & Rb & jdisp=0 { goto [Rb]; }
+:RET           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 2 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; goto [Rb]; }
+:JSR_COROUTINE Ra_lhs,(Rb),hint is opcode=0x1a & jop = 3 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; call [Rb]; }
 
 #=========================================================================
 # Integer Arithmetic Instructions
@@ -446,10 +447,27 @@ macro cmov(condition,reg,val) {
 :SEXTB op, Rc_lhs is opcode=0x1c & ofunc=0x00 & rega=31 & op & Rc_lhs { Rc_lhs = sext(op:1); }
 :SEXTW op, Rc_lhs is opcode=0x1c & ofunc=0x01 & rega=31 & op & Rc_lhs { Rc_lhs = sext(op:2); }
 
+# set complete bytes to zero
+macro zap(src, dest, bits) {
+  count:1 = 8;
+  mask:8 = 0;
+<next_bit>
+  mask = mask >> 8;
+  # zap bits ?
+  if ((bits & 1) == 1) goto <test_count>;
+  # keep bits
+  mask = mask | 0xff00000000000000:8;
+<test_count>
+  count = count - 1;
+  if (count == 0) goto <all_bits_done>;
+  goto <next_bit>;
+<all_bits_done>
+  dest = src & mask;
+}
+
 # zero bytes
-define pcodeop zero_bytes;
-:ZAP    Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x30 & Ra & op & Rc_lhs { zero_bytes(); }
-:ZAPNOT Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x31 & Ra & op & Rc_lhs { zero_bytes(); }
+:ZAP    Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x30 & Ra & op & Rc_lhs { zap(Ra, Rc_lhs, op); }
+:ZAPNOT Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x31 & Ra & op & Rc_lhs { zap(Ra, Rc_lhs, op^0xff); }
 
 #=========================================================================
 # Floating-Point Instructions
