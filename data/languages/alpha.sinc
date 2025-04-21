@@ -71,6 +71,12 @@ define register offset=0x400 size=8 [ TB_CTL Abox1    WDTB_PTE DTB_PTE_TEMP  MM_
 				      Abox24 Abox25   Abox26   Abox27        Abox28 Abox29    Abox30   Abox31 ];
 @endif
 
+# Paltemp registers
+define register offset=0x600 size=8 [ PalTemp0  PalTemp1  PalTemp2  PalTemp3  PalTemp4  PalTemp5  PalTemp6  PalTemp7
+                                      PalTemp8  PalTemp9  PalTemp10 PalTemp11 palTemp12 PalTemp13 PalTemp14 PalTemp15
+				      PalTemp16 PalTemp17 palTemp18 PalTemp19 PalTemp20 PalTemp21 PalTemp22 PalTemp23
+				      PalTemp24 PalTemp25 PalTemp26 PalTemp27 PalTemp28 PalTemp29 palTemp30 PalTemp31 ];
+
 @if defined(21164)
 # internal processor registers (IPRs)
 define register offset=0x300 size=8 [ ISR  ITB_TAG      ITB_PTE        ITB_ASN  ITB_PTE_TEMP ITB_IA    ITB_IAP  ITB_IS
@@ -180,6 +186,12 @@ attach variables [ fa ]   [ f0  f1  f2  f3  f4  f5  f6  f7  f8  f9  f10 f11 f12 
                             f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 fzero ];
 @endif
 
+# Paltemp registers
+attach variables [ tmpidx ] [ PalTemp0  PalTemp1  PalTemp2  PalTemp3  PalTemp4  PalTemp5  PalTemp6  PalTemp7
+                              PalTemp8  PalTemp9  PalTemp10 PalTemp11 palTemp12 PalTemp13 PalTemp14 PalTemp15
+                              PalTemp16 PalTemp17 palTemp18 PalTemp19 PalTemp20 PalTemp21 PalTemp22 PalTemp23
+                              PalTemp24 PalTemp25 PalTemp26 PalTemp27 PalTemp28 PalTemp29 palTemp30 PalTemp31 ];
+
 @if defined(21064)
 # 21064 Ibox registers
 attach variables [ ibox ] [ TB_TAG ITB_PTE ICCSR   ITB_PTE_TEMP EXC_ADDR SL_RCV ITBZAP  ITBASM
@@ -187,7 +199,7 @@ attach variables [ ibox ] [ TB_TAG ITB_PTE ICCSR   ITB_PTE_TEMP EXC_ADDR SL_RCV 
 			    HIER   SIER    ASTER   SL_CLR       Ibox20   Ibox21 SL_XMIT Ibox23
 			    Ibox24 Ibox25  Ibox26  Ibox27       Ibox28   Ibox29 Ibox30  Ibox31 ];
 # 21064 Abox registers
-attach variables [ abox]  [ TB_CTL Abox1    WDTB_PTE DTB_PTE_TEMP  MM_CSR  VA        DTBZAP   DTBASM
+attach variables [ abox ] [ TB_CTL Abox1    WDTB_PTE DTB_PTE_TEMP  MM_CSR  VA        DTBZAP   DTBASM
                             DTBIS  BIU_ADDR BIU_STAT Abox11
 @if defined(21064A)
 			                                           C_STAT
@@ -220,6 +232,9 @@ Rc_lhs: regc is regc { export regc; }
 Ra: rega is rega { export rega; }
 Rb: regb is regb { export regb; }
 Fa: rega is rega { export rega; }
+Ibox: ibox is ibox { export ibox; }
+Abox: abox is abox { export abox; }
+Temp: tmpidx is tmpidx { export tmpidx; }
 @if defined(VMS)
 Fa: FZ is rega=31 & FZ { export  0:8; }
 Ra: RZ is rega=31 & RZ { export  0:8; }
@@ -504,28 +519,28 @@ define pcodeop nop;
 # 21064: see EC–Q9ZUC–TE pg 95ff
 @if defined(21064)
 # -> Setting the PAL, ABX, and IBX fields to zero generates a NOP.
-:NOP                                                        is opcode=0x19 &                                           paltmp=0 & abx=0 & ibx=0 { nop(); }
-:NOP                                                        is opcode=0x1d &                                           paltmp=0 & abx=0 & ibx=0 { nop(); }
+:NOP                                       is opcode=0x19 &                                           paltmp=0 & abx=0 & ibx=0 { nop(); }
+:NOP                                       is opcode=0x1d &                                           paltmp=0 & abx=0 & ibx=0 { nop(); }
 # move from internal processor register
-:HW_MFPR^"/i"  rega, ibox                                   is opcode=0x19 & rega &        ibox &          rega=regb & paltmp=0 & abx=0 & ibx=1 { rega = ibox; }
-:HW_MFPR^"/a"  rega, abox                                   is opcode=0x19 & rega & abox &                 rega=regb & paltmp=0 & abx=1 & ibx=0 { rega = abox; }
-:HW_MFPR^"/p"  rega, "PAL_TEMP["^tmpidx^"]"                 is opcode=0x19 & rega &               tmpidx & rega=regb & paltmp=1 & abx=0 & ibx=0 { nop(); }
+:HW_MFPR^"/i"  Ra_lhs, Ibox                is opcode=0x19 & Ra_lhs &        Ibox &        rega=regb & paltmp=0 & abx=0 & ibx=1 { Ra_lhs = Ibox; }
+:HW_MFPR^"/a"  Ra_lhs, Abox                is opcode=0x19 & Ra_lhs & Abox &               rega=regb & paltmp=0 & abx=1 & ibx=0 { Ra_lhs = Abox; }
+:HW_MFPR^"/p"  Ra_lhs, Temp                is opcode=0x19 & Ra_lhs &               Temp & rega=regb & paltmp=1 & abx=0 & ibx=0 { Ra_lhs = Temp; }
 # move to internal processor register
-:HW_MTPR^"/i"  rega, ibox                                   is opcode=0x1d & rega &        ibox &          rega=regb & paltmp=0 & abx=0 & ibx=1 { ibox = rega; }
-:HW_MTPR^"/a"  rega, abox                                   is opcode=0x1d & rega & abox &                 rega=regb & paltmp=0 & abx=1 & ibx=0 { abox = rega; }
-:HW_MTPR^"/p"  rega, "PAL_TEMP["^tmpidx^"]"                 is opcode=0x1d & rega &               tmpidx & rega=regb & paltmp=1 & abx=0 & ibx=0 { nop(); }
+:HW_MTPR^"/i"  Ra, Ibox                    is opcode=0x1d & Ra     &        Ibox &        rega=regb & paltmp=0 & abx=0 & ibx=1 {            Ibox = Ra; }
+:HW_MTPR^"/a"  Ra, Abox                    is opcode=0x1d & Ra     & Abox &               rega=regb & paltmp=0 & abx=1 & ibx=0 { Abox = Ra; }
+:HW_MTPR^"/p"  Ra, Temp                    is opcode=0x1d & Ra     &               Temp & rega=regb & paltmp=1 & abx=0 & ibx=0 {                       Temp = Ra; }
 # move to multiple internal processor registers
-:HW_MTPR^"/ai"  rega, abox^"+"^ibox                         is opcode=0x1d & rega & abox & ibox &          rega=regb & paltmp=0 & abx=1 & ibx=1 { rega = ibox; }
-:HW_MTPR^"/ip"  rega, ibox^"+PAL_TEMP["^tmpidx^"]"          is opcode=0x1d & rega &        ibox & tmpidx & rega=regb & paltmp=1 & abx=0 & ibx=1 { rega = ibox; }
-:HW_MTPR^"/ap"  rega, abox^"+PAL_TEMP["^tmpidx^"]"          is opcode=0x1d & rega & abox &        tmpidx & rega=regb & paltmp=1 & abx=1 & ibx=0 { rega = abox; }
-:HW_MTPR^"/aip" rega, abox^"+"^ibox^"+PAL_TEMP["^tmpidx^"]" is opcode=0x1d & rega & abox & ibox & tmpidx & rega=regb & paltmp=1 & abx=1 & ibx=1 { rega = ibox; }
+:HW_MTPR^"/ai"  Ra, Abox^"+"^Ibox          is opcode=0x1d & Ra     & Abox & Ibox &        rega=regb & paltmp=0 & abx=1 & ibx=1 { Abox = Ra; Ibox = Ra; }
+:HW_MTPR^"/ip"  Ra, Ibox^"+"^Temp          is opcode=0x1d & Ra     &        Ibox & Temp & rega=regb & paltmp=1 & abx=0 & ibx=1 {            Ibox = Ra; Temp = Ra; }
+:HW_MTPR^"/ap"  Ra, Abox^"+"^Temp          is opcode=0x1d & Ra     & Abox &        Temp & rega=regb & paltmp=1 & abx=1 & ibx=0 { Abox = Ra;            Temp = Ra; }
+:HW_MTPR^"/aip" Ra, Abox^"+"^Ibox^"+"^Temp is opcode=0x1d & Ra     & Abox & Ibox & Temp & rega=regb & paltmp=1 & abx=1 & ibx=1 { Abox = Ra; IBox = Ra; Temp = Ra; }
 @else
-:HW_MTPR    rega is opcode=0x1d & rega { nop(); }
-:HW_MFPR  pcode is opcode=0x19 & pcode { nop(); }
+:HW_MTPR Ra     is opcode=0x1d & Ra { nop(); }
+:HW_MFPR pcode  is opcode=0x19 & pcode { nop(); }
 @endif
 :HW_LD rega,paldisp is opcode=0x1b & rega & paldisp { nop(); }
-:HW_REI   pcode is opcode=0x1e & pcode { nop(); }
-:HW_ST    pcode is opcode=0x1f & pcode { nop(); }
+:HW_REI pcode       is opcode=0x1e & pcode { nop(); }
+:HW_ST pcode        is opcode=0x1f & pcode { nop(); }
 
 # cache hints
 :ECB (Rb) is opcode=0x18 & mfunc=0xe800 & Rb { nop(); }
