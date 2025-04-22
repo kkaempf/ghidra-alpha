@@ -13,9 +13,11 @@ for i in $@; do
   j=$(basename $i .hex);
   echo -n "$i ";
   hex=$(grep -v ^\# $i | tr -d " \n");
-  out=$j.out$OS;
+  out=$j.out$OS$CPU;
   $(sleigh-lift disassemble $SLADIR/$CPU$OS.sla $hex > $out);
-  if [ -f $j.asm$OS ]; then
+  if [ -f $j.asm$OS$CPU ]; then
+    diff -wu $j.asm$OS$CPU $out;
+  elif [ -f $j.asm$OS ]; then
     diff -wu $j.asm$OS $out;
   else
     diff -wu $j.asm $out;
