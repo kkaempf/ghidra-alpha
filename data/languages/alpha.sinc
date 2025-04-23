@@ -259,8 +259,24 @@ Fa: rega is rega { tmp = rega; export tmp; }
 Ix: ibox is ibox { tmp:8 = ibox; export tmp; }
 Ax: abox is abox { tmp:8 = abox; export tmp; }
 Temp: tmpidx is tmpidx { tmp = tmpidx; export tmp; }
-hwaddr: hwdisp(Rb)^"/l" is hwdisp & Rb & qw=0 { d:2 = hwdisp & 0xffe; ptr = Rb + sext(d); export *[ram]:8 ptr; }
-hwaddr: hwdisp(Rb)^"/q" is hwdisp & Rb & qw=1 { d:2 = hwdisp & 0xffc; ptr = Rb + sext(d); export *[ram]:8 ptr; }
+hwaddr: hwdisp(Rb) is hwdisp & Rb & qw=0 { d:2 = hwdisp & 0xffe; ptr = Rb + sext(d); export *[ram]:8 ptr; }
+hwaddr: hwdisp(Rb) is hwdisp & Rb & qw=1 { d:2 = hwdisp & 0xffc; ptr = Rb + sext(d); export *[ram]:8 ptr; }
+hwmode: ".l/vir"         is phy=0 & alt=0 & rwc=0 & qw=0 { export 0:8; }
+hwmode: ".q/vir"         is phy=0 & alt=0 & rwc=0 & qw=1 { export 0:8; }
+hwmode: ".l/vir/rwc"     is phy=0 & alt=0 & rwc=1 & qw=0 { export 0:8; }
+hwmode: ".q/vir/rwc"     is phy=0 & alt=0 & rwc=1 & qw=1 { export 0:8; }
+hwmode: ".l/vir/alt"     is phy=0 & alt=1 & rwc=0 & qw=0 { export 0:8; }
+hwmode: ".q/vir/alt"     is phy=0 & alt=1 & rwc=0 & qw=1 { export 0:8; }
+hwmode: ".l/vir/alt/rwc" is phy=0 & alt=1 & rwc=1 & qw=0 { export 0:8; }
+hwmode: ".q/vir/alt/rwc" is phy=0 & alt=1 & rwc=1 & qw=1 { export 0:8; }
+hwmode: ".l/phy"         is phy=1 & alt=0 & rwc=0 & qw=0 { export 0:8; }
+hwmode: ".q/phy"         is phy=1 & alt=0 & rwc=0 & qw=1 { export 0:8; }
+hwmode: ".l/phy/rwc"     is phy=1 & alt=0 & rwc=1 & qw=0 { export 0:8; }
+hwmode: ".q/phy/rwc"     is phy=1 & alt=0 & rwc=1 & qw=1 { export 0:8; }
+hwmode: ".l/phy/alt"     is phy=1 & alt=1 & rwc=0 & qw=0 { export 0:8; }
+hwmode: ".q/phy/alt"     is phy=1 & alt=1 & rwc=0 & qw=1 { export 0:8; }
+hwmode: ".l/phy/alt/rwc" is phy=1 & alt=1 & rwc=1 & qw=0 { export 0:8; }
+hwmode: ".q/phy/alt/rwc" is phy=1 & alt=1 & rwc=1 & qw=1 { export 0:8; }
 @endif
 @if defined(VMS)
 Fa: FZ is rega=31 & FZ { export  0:8; }
@@ -572,8 +588,8 @@ define pcodeop nop;
 :HW_MTPR^"/ip"  Ra, Ix^"+"^Temp        is opcode=0x1d & Ra     &      Ix & Temp & rega=regb & paltmp=1 & abx=0 & ibx=1 {          Ix = Ra; Temp = Ra; }
 :HW_MTPR^"/ap"  Ra, Ax^"+"^Temp        is opcode=0x1d & Ra     & Ax &      Temp & rega=regb & paltmp=1 & abx=1 & ibx=0 { Ax = Ra;          Temp = Ra; }
 :HW_MTPR^"/aip" Ra, Ax^"+"^Ix^"+"^Temp is opcode=0x1d & Ra     & Ax & Ix & Temp & rega=regb & paltmp=1 & abx=1 & ibx=1 { Ax = Ra; Ix = Ra; Temp = Ra; }
-:HW_LD rega,hwaddr is opcode=0x1b & rega & hwaddr { nop(); }
-:HW_ST rega,hwaddr is opcode=0x1f & rega & hwaddr { nop(); }
+:HW_LD^hwmode rega,hwaddr is opcode=0x1b & hwmode & rega & hwaddr { nop(); }
+:HW_ST^hwmode rega,hwaddr is opcode=0x1f & hwmode & rega & hwaddr { nop(); }
 :HW_REI pcode      is opcode=0x1e & pcode { nop(); }
 @else
 :HW_MTPR Ra     is opcode=0x1d & Ra { nop(); }
