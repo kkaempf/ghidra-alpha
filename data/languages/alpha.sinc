@@ -259,6 +259,8 @@ Fa: rega is rega { tmp = rega; export tmp; }
 Ix: ibox is ibox { tmp:8 = ibox; export tmp; }
 Ax: abox is abox { tmp:8 = abox; export tmp; }
 Temp: tmpidx is tmpidx { tmp = tmpidx; export tmp; }
+hwaddr: hwdisp(Rb)^"/l" is hwdisp & Rb & qw=0 { d:2 = hwdisp & 0xffe; ptr = Rb + sext(d); export *[ram]:8 ptr; }
+hwaddr: hwdisp(Rb)^"/q" is hwdisp & Rb & qw=1 { d:2 = hwdisp & 0xffc; ptr = Rb + sext(d); export *[ram]:8 ptr; }
 @endif
 @if defined(VMS)
 Fa: FZ is rega=31 & FZ { export  0:8; }
@@ -570,13 +572,16 @@ define pcodeop nop;
 :HW_MTPR^"/ip"  Ra, Ix^"+"^Temp        is opcode=0x1d & Ra     &      Ix & Temp & rega=regb & paltmp=1 & abx=0 & ibx=1 {          Ix = Ra; Temp = Ra; }
 :HW_MTPR^"/ap"  Ra, Ax^"+"^Temp        is opcode=0x1d & Ra     & Ax &      Temp & rega=regb & paltmp=1 & abx=1 & ibx=0 { Ax = Ra;          Temp = Ra; }
 :HW_MTPR^"/aip" Ra, Ax^"+"^Ix^"+"^Temp is opcode=0x1d & Ra     & Ax & Ix & Temp & rega=regb & paltmp=1 & abx=1 & ibx=1 { Ax = Ra; Ix = Ra; Temp = Ra; }
+:HW_LD rega,hwaddr is opcode=0x1b & rega & hwaddr { nop(); }
+:HW_ST rega,hwaddr is opcode=0x1f & rega & hwaddr { nop(); }
+:HW_REI pcode      is opcode=0x1e & pcode { nop(); }
 @else
 :HW_MTPR Ra     is opcode=0x1d & Ra { nop(); }
 :HW_MFPR pcode  is opcode=0x19 & pcode { nop(); }
-@endif
-:HW_LD rega,paldisp is opcode=0x1b & rega & paldisp { nop(); }
 :HW_REI pcode       is opcode=0x1e & pcode { nop(); }
+:HW_LD rega,paldisp is opcode=0x1b & rega & paldisp { nop(); }
 :HW_ST pcode        is opcode=0x1f & pcode { nop(); }
+@endif
 
 # cache hints
 :ECB (Rb) is opcode=0x18 & mfunc=0xe800 & Rb { nop(); }
