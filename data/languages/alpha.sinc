@@ -69,6 +69,24 @@ define register offset=0x400 size=8 [ TB_CTL Abox1    WDTB_PTE DTB_PTE_TEMP  MM_
                                                                                     FILL_ADDR ABOX_CTL ALT_MODE
                                       CC     CC_CTL   BIU_CTL  FILL_SYNDROME BC_TAG FLUSH_IC  Abox22   FLUSH_IC_ASM
 				      Abox24 Abox25   Abox26   Abox27        Abox28 Abox29    Abox30   Abox31 ];
+
+# simulate HW_LD and HW_ST flags as registers
+#	phys   = (15, 15) # hw_ld physical
+#	alt    = (14, 14) # hw_ld alt mode
+#	rwc    = (13, 13) # hw_ld read-with-write check
+#       quad   = (12, 12) # hw_ld quadword
+#                                     0      1    2     3    4     5     6     7
+define register offset=0x500 size=1 [ _      l    v    lv    q    lq    vq    lvq
+                                      w     wl   wv   wlv   wq   wlq   wvq   wlvq
+				      a     al   av   alv   aq   alq   avq   alvq
+				      aw   awl  awv  awlv  awq  awlq  awvq  awlvq
+                                      p     pl   vp   plv   pq   plq   vpq   plvq
+                                      pw   pwl  pwv  pwlv  pwq  pwlq  pwvq  pwlvq
+				      pa   pal  pav  palv  paq  palq  pavq  palvq
+				      paw pawl pawv pawlv pawq pawlq pawvq pawlvq ];
+
+
+
 @endif
 
 # Paltemp registers
@@ -149,6 +167,11 @@ define token inst (32)
         ldst   = (10, 15) # PAL load/store flags
         lit    = (13, 20) signed dec # literal
         is_lit = (12, 12) # bit 12: 0->SBZ, 1->LIT
+	phy    = (15, 15) # HW physical(1)/virtual(0) access
+	alt    = (14, 14) # HW ALT_MODE ?
+	rwc    = (13, 13) # HW read-with-write check
+	qw     = (12, 12) # HW quad word ?
+	hwdisp = ( 0, 11) # displacement of 21064 HW_LD/HW_ST
         ofunc  = ( 5, 11) # operate function
 	paltmp = ( 7,  7) # 21064 PAL 19/1D ref to PALtemp
 	abx    = ( 6,  6) # 21064 PAL 19/1D ref to Abox
@@ -232,9 +255,11 @@ Rc_lhs: regc is regc { tmp = regc; export tmp; }
 Ra: rega is rega { tmp = rega; export tmp; }
 Rb: regb is regb { tmp = regb; export tmp; }
 Fa: rega is rega { tmp = rega; export tmp; }
+@if defined(21064)
 Ix: ibox is ibox { tmp:8 = ibox; export tmp; }
 Ax: abox is abox { tmp:8 = abox; export tmp; }
 Temp: tmpidx is tmpidx { tmp = tmpidx; export tmp; }
+@endif
 @if defined(VMS)
 Fa: FZ is rega=31 & FZ { export  0:8; }
 Ra: RZ is rega=31 & RZ { export  0:8; }
@@ -464,20 +489,31 @@ macro cmov(condition,reg,val) {
 
 # set complete bytes to zero
 macro zap(src, dest, bits) {
-  count:1 = 8;
-  mask:8 = 0;
-<next_bit>
-  mask = mask >> 8;
-  # zap bits ?
-  if ((bits & 1) == 1) goto <test_count>;
-  # keep bits
-  mask = mask | 0xff00000000000000:8;
-<test_count>
-  count = count - 1;
-  if (count == 0) goto <all_bits_done>;
-  goto <next_bit>;
-<all_bits_done>
-  dest = src & mask;
+  dest = src;
+  if ((bits & 0x01) == 0) goto <nozap0>;
+  dest[0,8] = 0;
+<nozap0>
+  if ((bits & 0x02) == 0) goto <nozap1>;
+  dest[8,8] = 0;
+<nozap1>
+  if ((bits & 0x04) == 0) goto <nozap2>;
+  dest[16,8] = 0;
+<nozap2>
+  if ((bits & 0x08) == 0) goto <nozap3>;
+  dest[24,8] = 0;
+<nozap3>
+  if ((bits & 0x01) == 0) goto <nozap4>;
+  dest[32,8] = 0;
+<nozap4>
+  if ((bits & 0x02) == 0) goto <nozap5>;
+  dest[40,8] = 0;
+<nozap5>
+  if ((bits & 0x04) == 0) goto <nozap6>;
+  dest[48,8] = 0;
+<nozap6>
+  if ((bits & 0x08) == 0) goto <nozap7>;
+  dest[56,8] = 0;
+<nozap7>
 }
 
 # zero bytes
