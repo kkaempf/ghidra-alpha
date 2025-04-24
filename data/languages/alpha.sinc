@@ -623,7 +623,8 @@ define pcodeop nop;
 @endif
 
 # memory barrier
-:MB is opcode=0x18 & mfunc=0x4000 { nop(); }
+define pcodeop barrier;
+:MB is opcode=0x18 & mfunc=0x4000 { barrier(); }
 
 # get cylce counter
 define pcodeop cycle_counter;
