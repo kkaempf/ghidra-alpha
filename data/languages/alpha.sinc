@@ -588,12 +588,12 @@ define pcodeop nop;
 :HW_MTPR^"/ip"  Ra, Ix^"+"^Temp        is opcode=0x1d & Ra     &      Ix & Temp & rega=regb & paltmp=1 & abx=0 & ibx=1 {          Ix = Ra; Temp = Ra; }
 :HW_MTPR^"/ap"  Ra, Ax^"+"^Temp        is opcode=0x1d & Ra     & Ax &      Temp & rega=regb & paltmp=1 & abx=1 & ibx=0 { Ax = Ra;          Temp = Ra; }
 :HW_MTPR^"/aip" Ra, Ax^"+"^Ix^"+"^Temp is opcode=0x1d & Ra     & Ax & Ix & Temp & rega=regb & paltmp=1 & abx=1 & ibx=1 { Ax = Ra; Ix = Ra; Temp = Ra; }
-:HW_LD^hwmode rega,hwaddr is opcode=0x1b & hwmode & rega & hwaddr { nop(); }
-:HW_ST^hwmode rega,hwaddr is opcode=0x1f & hwmode & rega & hwaddr { nop(); }
+:HW_LD^hwmode rega,hwaddr is opcode=0x1b & hwmode & rega & hwaddr { rega = hwaddr; }
+:HW_ST^hwmode rega,hwaddr is opcode=0x1f & hwmode & rega & hwaddr { hwaddr = rega; }
 :HW_REI pcode      is opcode=0x1e & pcode { nop(); }
 @else
-:HW_MTPR Ra     is opcode=0x1d & Ra { nop(); }
-:HW_MFPR pcode  is opcode=0x19 & pcode { nop(); }
+:HW_MTPR Ra         is opcode=0x1d & Ra { nop(); }
+:HW_MFPR pcode      is opcode=0x19 & pcode { nop(); }
 :HW_REI pcode       is opcode=0x1e & pcode { nop(); }
 :HW_LD rega,paldisp is opcode=0x1b & rega & paldisp { nop(); }
 :HW_ST pcode        is opcode=0x1f & pcode { nop(); }
