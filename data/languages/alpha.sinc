@@ -14,7 +14,6 @@ define alignment=1;
 define space ram      type=ram_space      size=8  wordsize=1 default;
 define space register type=register_space size=8;
 
-
 #--------------------------------------------------------------------------
 # Registers
 @if defined(VMS)
@@ -568,7 +567,17 @@ define pcodeop nop;
 :HALT           is opcode=0x00 & pcode=0    { nop(); }
 :DRAINA         is opcode=0x00 & pcode=2    { nop(); }
 :IMB            is opcode=0x00 & pcode=0x86 { nop(); }
+# 4.1.5 Exceptions Address Register (EXC_ADDR)
+# CALL_PAL exceptions load the EXC_ADDR with the PC of the instruction following the CALL_PAL
+@if defined(21064)
+:CALL_PAL pcode is opcode=0x00 & pcode      { reg:8 = 0x320; ptr:8 = inst_next; *[register]reg = ptr; }
+@endif
+@if defined(21164)
+:CALL_PAL pcode is opcode=0x00 & pcode      { reg:8 = 0x358; ptr:8 = inst_next; *[register]reg = ptr; }
+@endif
+@if defined(21264)
 :CALL_PAL pcode is opcode=0x00 & pcode      { nop(); }
+@endif
 
 # 21064: see EC-Q9ZUC-TE pg 95ff
 @if defined(21064)
@@ -590,11 +599,13 @@ define pcodeop nop;
 :HW_MTPR^"/aip" Ra, Ax^"+"^Ix^"+"^Temp is opcode=0x1d & Ra     & Ax & Ix & Temp & rega=regb & paltmp=1 & abx=1 & ibx=1 { Ax = Ra; Ix = Ra; Temp = Ra; }
 :HW_LD^hwmode rega,hwaddr is opcode=0x1b & hwmode & rega & hwaddr { rega = hwaddr; }
 :HW_ST^hwmode rega,hwaddr is opcode=0x1f & hwmode & rega & hwaddr { hwaddr = rega; }
-:HW_REI pcode      is opcode=0x1e & pcode { nop(); }
+# offset 0x320 ==  EXC_ADDR
+:HW_REI pcode      is opcode=0x1e & pcode { reg:8 = 0x320; ptr:8 = *[register]reg; goto [ptr]; }
 @else
 :HW_MTPR Ra         is opcode=0x1d & Ra { nop(); }
 :HW_MFPR pcode      is opcode=0x19 & pcode { nop(); }
 :HW_REI pcode       is opcode=0x1e & pcode { nop(); }
+# 21164 :HW_REI pcode      is opcode=0x1e & pcode { reg:8 = 0x358; ptr:8 = *[register]reg; goto [ptr]; }
 :HW_LD rega,paldisp is opcode=0x1b & rega & paldisp { nop(); }
 :HW_ST pcode        is opcode=0x1f & pcode { nop(); }
 @endif
@@ -643,3 +654,15 @@ define pcodeop cycle_counter;
 # VAX compatibility instructions
 :RC Ra is opcode=0x18 & mfunc=0xe000 & Ra { nop(); }
 :RS Ra is opcode=0x18 & mfunc=0xf000 & Ra { nop(); }
+
+# Opcodes reserved to Digital
+@if defined(21064)
+:OPC01 is opcode=0x01 unimpl
+:OPC02 is opcode=0x02 unimpl
+:OPC03 is opcode=0x03 unimpl
+:OPC04 is opcode=0x04 unimpl
+:OPC05 is opcode=0x05 unimpl
+:OPC06 is opcode=0x06 unimpl
+:OPC07 is opcode=0x07 unimpl
+:OPC14 is opcode=0x14 unimpl
+@endif

@@ -14,3 +14,4 @@
 0x00000034: HW_LD.q/phy/alt R1,0x123(R2)
 0x00000038: HW_LD.l/phy/alt/rwc R1,0x123(R2)
 0x0000003c: HW_LD.q/phy/alt/rwc R1,0x123(R2)
+0x00000040: HW_REI 0x0
