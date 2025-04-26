@@ -166,7 +166,9 @@ define token inst (32)
         ldst   = (10, 15) # PAL load/store flags
         lit    = (13, 20) signed dec # literal
         is_lit = (12, 12) # bit 12: 0->SBZ, 1->LIT
+	bit15  = (15, 15) # for HW_REI
 	phy    = (15, 15) # HW physical(1)/virtual(0) access
+	bit14  = (14, 14) # for HW_REI
 	alt    = (14, 14) # HW ALT_MODE ?
 	rwc    = (13, 13) # HW read-with-write check
 	qw     = (12, 12) # HW quad word ?
@@ -231,7 +233,7 @@ attach variables [ abox ] [ TB_CTL Abox1    WDTB_PTE DTB_PTE_TEMP  MM_CSR  VA   
                                                                            FILL_ADDR ABOX_CTL ALT_MODE
                             CC     CC_CTL   BIU_CTL  FILL_SYNDROME BC_TAG  FLUSH_IC  Abox22   FLUSH_IC_ASM
 			    Abox24 Abox25   Abox26   Abox27        Abox28  Abox29    Abox30   Abox31 ];
-@endif
+@endif # 21064
 
 @if defined(21164)
 attach variables [ ldst ] [   _    l    v    lv    q    lq    vq    lvq
@@ -302,8 +304,11 @@ disp_pc: loc is bdisp [ loc = inst_next + (bdisp << 2); ] { export *[ram]:8 loc;
 # jump hint
 hint:    loc is jdisp [ loc = inst_next + (jdisp << 2); ] { export *[ram]:8 loc; }
 
+@if defined(21064)
+@else
 # PAL 1B displacement
 paldisp: pdisp(Rb) is pdisp & Rb  { ptr:8 = Rb + sext(pdisp:2); export ptr; }
+@endif
 
 # arith operand
 op: lit is lit & is_lit = 1 { export *[const]:8 lit; }
@@ -600,11 +605,11 @@ define pcodeop nop;
 :HW_LD^hwmode rega,hwaddr is opcode=0x1b & hwmode & rega & hwaddr { rega = hwaddr; }
 :HW_ST^hwmode rega,hwaddr is opcode=0x1f & hwmode & rega & hwaddr { hwaddr = rega; }
 # offset 0x320 ==  EXC_ADDR
-:HW_REI pcode      is opcode=0x1e & pcode { reg:8 = 0x320; ptr:8 = *[register]reg; goto [ptr]; }
-@else
+:HW_REI             is opcode=0x1e & rega=31 & regb=31 & bit15=1 & bit14=0 { reg:8 = 0x320; ptr:8 = *[register]reg; goto [ptr]; }
+@else # not 21064
 :HW_MTPR Ra         is opcode=0x1d & Ra { nop(); }
 :HW_MFPR pcode      is opcode=0x19 & pcode { nop(); }
-:HW_REI pcode       is opcode=0x1e & pcode { nop(); }
+:HW_REI             is opcode=0x1e & bit15=1 & bit14=0 { nop(); }
 # 21164 :HW_REI pcode      is opcode=0x1e & pcode { reg:8 = 0x358; ptr:8 = *[register]reg; goto [ptr]; }
 :HW_LD rega,paldisp is opcode=0x1b & rega & paldisp { nop(); }
 :HW_ST pcode        is opcode=0x1f & pcode { nop(); }
