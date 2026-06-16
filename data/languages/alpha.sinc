@@ -164,7 +164,7 @@ define token inst (32)
         jdisp  = ( 0, 13) signed # jump displacement
         sbz    = (13, 15) # should be zero
         ldst   = (10, 15) # PAL load/store flags
-        lit    = (13, 20) signed dec # literal
+        lit    = (13, 20) dec # literal (8-bit, zero-extended)
         is_lit = (12, 12) # bit 12: 0->SBZ, 1->LIT
 	bit15  = (15, 15) # for HW_REI
 	phy    = (15, 15) # HW physical(1)/virtual(0) access
