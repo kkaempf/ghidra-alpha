@@ -382,8 +382,8 @@ fcc: "GT" is ccode=7 & is_i = 0 & Fa { tmp:1 = (Fa f> 0); export tmp; }
 :BSR  Ra_lhs, disp_pc is opcode=0x34 & Ra_lhs  & disp_pc { Ra_lhs = inst_next; call disp_pc; }
 
 # PC-relative branch conditional
-:BLBC  Ra, disp_pc is bcode=0x3 & is_i=1 & ccode=0 & Ra & disp_pc { Bexpr(Ra, Ra:1 ^ 1, disp_pc); }
-:BLBS  Ra, disp_pc is bcode=0x3 & is_i=1 & ccode=4 & Ra & disp_pc { Bexpr(Ra, Ra:1 & 1, disp_pc); }
+:BLBC  Ra, disp_pc is bcode=0x3 & is_i=1 & ccode=0 & Ra & disp_pc { if ((Ra & 1) == 0) goto disp_pc; }
+:BLBS  Ra, disp_pc is bcode=0x3 & is_i=1 & ccode=4 & Ra & disp_pc { if ((Ra & 1) != 0) goto disp_pc; }
 :B^icc Ra, disp_pc is bcode=0x3 & is_i=1 & icc     & Ra & disp_pc { if (icc) goto disp_pc; }
 
 # jumps
