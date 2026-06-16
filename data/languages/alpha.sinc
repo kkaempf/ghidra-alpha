@@ -371,6 +371,14 @@ fcc: "GT" is ccode=7 & is_i = 0 & Fa { tmp:1 = (Fa f> 0); export tmp; }
 # store to unaligned
 :STQ_U  Ra, disp_regb is opcode=0x0f & Ra & disp_regb { ptr = disp_regb & ~7; *ptr = Ra; }
 
+# Prefetch hints: load instructions with the destination register set to 31.
+# More-constrained than the plain loads, so they take precedence.
+define pcodeop prefetch;
+:PREFETCH     disp_regb is opcode=0x28 & rega=31 & disp_regb { prefetch(disp_regb); }
+:PREFETCH_EN  disp_regb is opcode=0x29 & rega=31 & disp_regb { prefetch(disp_regb); }
+:PREFETCH_M   disp_regb is opcode=0x22 & fa=31 & disp_regb { prefetch(disp_regb); }
+:PREFETCH_MEN disp_regb is opcode=0x23 & fa=31 & disp_regb { prefetch(disp_regb); }
+
 #=========================================================================
 # Control Instructions
 #=========================================================================
