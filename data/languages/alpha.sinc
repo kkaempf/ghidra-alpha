@@ -458,8 +458,8 @@ macro cmov(condition,reg,val) {
 :CMOVEQ  Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x24 & Ra & op & Rc_lhs  { cmov(Ra == 0,Rc_lhs,op); }
 :CMOVGE  Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x46 & Ra & op & Rc_lhs  { cmov(Ra s>= 0,Rc_lhs,op); }
 :CMOVGT  Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x66 & Ra & op & Rc_lhs  { cmov(Ra s> 0,Rc_lhs,op); }
-:CMOVLBC Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x16 & Ra & op & Rc_lhs  { cmov((Ra:1 ^ 0x1),Rc_lhs,op); }
-:CMOVLBS Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x14 & Ra & op & Rc_lhs  { cmov((Ra:1 & 0x1),Rc_lhs,op); }
+:CMOVLBC Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x16 & Ra & op & Rc_lhs  { cmov((Ra & 1) == 0,Rc_lhs,op); }
+:CMOVLBS Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x14 & Ra & op & Rc_lhs  { cmov((Ra & 1) == 1,Rc_lhs,op); }
 :CMOVLE  Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x64 & Ra & op & Rc_lhs  { cmov(Ra s<= 0,Rc_lhs,op); }
 :CMOVLT  Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x44 & Ra & op & Rc_lhs  { cmov(Ra s< 0,Rc_lhs,op); }
 :CMOVNE  Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x26 & Ra & op & Rc_lhs  { cmov(Ra != 0,Rc_lhs,op); }
