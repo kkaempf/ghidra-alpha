@@ -457,6 +457,7 @@ define pcodeop count_trailing_zeros;
 # logical functions
 :AND   Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x00 & Ra & op & Rc_lhs    { Rc_lhs = Ra & op; }
 :BIC   Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x08 & Ra & op & Rc_lhs    { Rc_lhs = Ra & ~op; }
+:NOP           is opcode=0x11 & ofunc=0x20 & rega=31 & regb=31 & regc=31 & is_lit=0 { }
 :CLR           Rc_lhs is opcode=0x11 & ofunc=0x20 & rega=31 & regb=31 & is_lit=0 & Rc_lhs { Rc_lhs = 0; }
 :MOV       op, Rc_lhs is opcode=0x11 & ofunc=0x20 & rega=31 & op & Rc_lhs { Rc_lhs = op; }
 :MOV       op, Rc_lhs is opcode=0x11 & ofunc=0x20 & rega=regb & op & Rc_lhs { Rc_lhs = op; }
@@ -608,6 +609,7 @@ define pcodeop set_fpcr;
 define pcodeop get_fpcr;
 
 # copy sign / copy sign-and-exponent
+:FNOP  is opcode=0x17 & fpfunc=0x020 & fa=31 & fb=31 & fc=31 { }
 :CPYS  Fa, Fb, Fc is opcode=0x17 & fpfunc=0x020 & Fa & Fb & Fc { Fc = (Fa & 0x8000000000000000) | (Fb & 0x7fffffffffffffff); }
 :CPYSN Fa, Fb, Fc is opcode=0x17 & fpfunc=0x021 & Fa & Fb & Fc { Fc = ((Fa & 0x8000000000000000) ^ 0x8000000000000000) | (Fb & 0x7fffffffffffffff); }
 :CPYSE Fa, Fb, Fc is opcode=0x17 & fpfunc=0x022 & Fa & Fb & Fc { Fc = (Fa & 0xfff0000000000000) | (Fb & 0x000fffffffffffff); }
