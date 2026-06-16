@@ -356,7 +356,7 @@ fcc: "GT" is ccode=7 & is_i = 0 & Fa { tmp:1 = (Fa f> 0); export tmp; }
 
 # load memory locked
 :LDL_L  Ra_lhs, disp_regb is opcode=0x2a & Ra_lhs & disp_regb { Ra_lhs = sext(*:4 disp_regb); }
-:LDQ_L  Ra_lhs, disp_regb is opcode=0x2b & Ra_lhs & disp_regb { Ra_lhs = disp_regb; }
+:LDQ_L  Ra_lhs, disp_regb is opcode=0x2b & Ra_lhs & disp_regb { Ra_lhs = *disp_regb; }
 
 # store to memory conditional
 :STL_C  Ra, disp_regb is opcode=0x2e & Ra & disp_regb { *:4 disp_regb = Ra:4; }
