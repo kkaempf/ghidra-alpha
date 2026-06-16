@@ -485,8 +485,19 @@ macro cmov(condition,reg,val) {
 # Byte Manipulation Instructions
 #=========================================================================
 
-# compare byte
-:CMPBGE Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x0f & Ra & op & Rc_lhs unimpl
+# compare byte: per-byte unsigned >=, one result bit per byte in Rc<7:0>
+:CMPBGE Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x0f & Ra & op & Rc_lhs {
+  local r:1 = 0;
+  local c:1 = Ra[0,8]  >= op[0,8];  r = r | (c << 0);
+  c = Ra[8,8]   >= op[8,8];  r = r | (c << 1);
+  c = Ra[16,8]  >= op[16,8]; r = r | (c << 2);
+  c = Ra[24,8]  >= op[24,8]; r = r | (c << 3);
+  c = Ra[32,8]  >= op[32,8]; r = r | (c << 4);
+  c = Ra[40,8]  >= op[40,8]; r = r | (c << 5);
+  c = Ra[48,8]  >= op[48,8]; r = r | (c << 6);
+  c = Ra[56,8]  >= op[56,8]; r = r | (c << 7);
+  Rc_lhs = zext(r);
+}
 
 # extract byte
 :EXTBL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x06 & Ra & op & Rc_lhs unimpl
