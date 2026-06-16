@@ -465,11 +465,11 @@ macro cmov(condition,reg,val) {
 :CMOVNE  Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x26 & Ra & op & Rc_lhs  { cmov(Ra != 0,Rc_lhs,op); }
 
 # shift logical
-:SLL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x39 & Ra & op & Rc_lhs { Rc_lhs = Ra << op[0,5]; }
-:SRL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x34 & Ra & op & Rc_lhs { Rc_lhs = Ra >> op[0,5]; }
+:SLL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x39 & Ra & op & Rc_lhs { Rc_lhs = Ra << op[0,6]; }
+:SRL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x34 & Ra & op & Rc_lhs { Rc_lhs = Ra >> op[0,6]; }
 
 # shift arithmetic
-:SRA Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x3c & Ra & op & Rc_lhs { Rc_lhs = Ra s>> op[0,5]; }
+:SRA Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x3c & Ra & op & Rc_lhs { Rc_lhs = Ra s>> op[0,6]; }
 
 #=========================================================================
 # Byte Manipulation Instructions
