@@ -180,6 +180,8 @@ define token inst (32)
 	hwsdisp_ev5 = ( 0,  9) signed # signed displacement of 21164 HW_LD/HW_ST
         ofunc  = ( 5, 11) # operate function
         fpfunc = ( 5, 15) # floating-point 11-bit function code
+        fp_lo  = ( 5, 10) # FP function code <5:0>  (operation + precision)
+        fp_hi  = (11, 15) # FP function code <10:6> (round/trap qualifier)
 	paltmp = ( 7,  7) # 21064 PAL 19/1D ref to PALtemp
 	abx    = ( 6,  6) # 21064 PAL 19/1D ref to Abox
 	ibx    = ( 5,  5) # 21064 PAL 19/1D ref to Ibox
@@ -643,6 +645,130 @@ define pcodeop float_sqrt;
 :SQRTT Fb, Fc is opcode=0x14 & fpfunc=0x0ab & fa=31 & Fb & Fc { Fc = float_sqrt(Fb); }
 
 #=========================================================================
+# IEEE (opcode 0x16) and VAX (opcode 0x15) floating-point arithmetic
+#
+# The 11-bit function code splits into an operation/precision part (fp_lo)
+# and a round/trap qualifier (fp_hi). The qualifier subtables decode every
+# documented suffix; the arithmetic is modeled with float p-code (S is
+# treated as a double here — adequate for analysis, not bit-exact rounding).
+#=========================================================================
+
+# IEEE round/trap qualifier suffixes (Table C-3)
+ieeequal: ""      is fp_hi=0x02 { }
+ieeequal: "/C"    is fp_hi=0x00 { }
+ieeequal: "/M"    is fp_hi=0x01 { }
+ieeequal: "/D"    is fp_hi=0x03 { }
+ieeequal: "/U"    is fp_hi=0x06 { }
+ieeequal: "/UC"   is fp_hi=0x04 { }
+ieeequal: "/UM"   is fp_hi=0x05 { }
+ieeequal: "/UD"   is fp_hi=0x07 { }
+ieeequal: "/SU"   is fp_hi=0x16 { }
+ieeequal: "/SUC"  is fp_hi=0x14 { }
+ieeequal: "/SUM"  is fp_hi=0x15 { }
+ieeequal: "/SUD"  is fp_hi=0x17 { }
+ieeequal: "/SUI"  is fp_hi=0x1e { }
+ieeequal: "/SUIC" is fp_hi=0x1c { }
+ieeequal: "/SUIM" is fp_hi=0x1d { }
+ieeequal: "/SUID" is fp_hi=0x1f { }
+
+# VAX round/trap qualifier suffixes (Table C-4)
+vaxqual: ""     is fp_hi=0x02 { }
+vaxqual: "/C"   is fp_hi=0x00 { }
+vaxqual: "/U"   is fp_hi=0x06 { }
+vaxqual: "/UC"  is fp_hi=0x04 { }
+vaxqual: "/S"   is fp_hi=0x12 { }
+vaxqual: "/SC"  is fp_hi=0x10 { }
+vaxqual: "/SU"  is fp_hi=0x16 { }
+vaxqual: "/SUC" is fp_hi=0x14 { }
+
+# IEEE convert-to-integer qualifiers (V/SV family; same slots as ieeequal but
+# printed with V instead of U). Used by CVTTQ.
+cvtqual: ""      is fp_hi=0x02 { }
+cvtqual: "/C"    is fp_hi=0x00 { }
+cvtqual: "/M"    is fp_hi=0x01 { }
+cvtqual: "/D"    is fp_hi=0x03 { }
+cvtqual: "/V"    is fp_hi=0x06 { }
+cvtqual: "/VC"   is fp_hi=0x04 { }
+cvtqual: "/VM"   is fp_hi=0x05 { }
+cvtqual: "/VD"   is fp_hi=0x07 { }
+cvtqual: "/SV"   is fp_hi=0x16 { }
+cvtqual: "/SVC"  is fp_hi=0x14 { }
+cvtqual: "/SVM"  is fp_hi=0x15 { }
+cvtqual: "/SVD"  is fp_hi=0x17 { }
+cvtqual: "/SVI"  is fp_hi=0x1e { }
+cvtqual: "/SVIC" is fp_hi=0x1c { }
+cvtqual: "/SVIM" is fp_hi=0x1d { }
+cvtqual: "/SVID" is fp_hi=0x1f { }
+
+# VAX CVTGQ qualifiers (Table C-4)
+cvtgqual: ""     is fp_hi=0x02 { }
+cvtgqual: "/C"   is fp_hi=0x00 { }
+cvtgqual: "/V"   is fp_hi=0x06 { }
+cvtgqual: "/VC"  is fp_hi=0x04 { }
+cvtgqual: "/S"   is fp_hi=0x12 { }
+cvtgqual: "/SC"  is fp_hi=0x10 { }
+cvtgqual: "/SV"  is fp_hi=0x16 { }
+cvtgqual: "/SVC" is fp_hi=0x14 { }
+
+# CVTST qualifiers (none, /S)
+cvstqual: ""   is fp_hi=0x0a { }
+cvstqual: "/S" is fp_hi=0x1a { }
+
+:ADDS^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x00 & ieeequal & Fa & Fb & Fc { Fc = Fa f+ Fb; }
+:SUBS^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x01 & ieeequal & Fa & Fb & Fc { Fc = Fa f- Fb; }
+:MULS^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x02 & ieeequal & Fa & Fb & Fc { Fc = Fa f* Fb; }
+:DIVS^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x03 & ieeequal & Fa & Fb & Fc { Fc = Fa f/ Fb; }
+:ADDT^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x20 & ieeequal & Fa & Fb & Fc { Fc = Fa f+ Fb; }
+:SUBT^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x21 & ieeequal & Fa & Fb & Fc { Fc = Fa f- Fb; }
+:MULT^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x22 & ieeequal & Fa & Fb & Fc { Fc = Fa f* Fb; }
+:DIVT^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x23 & ieeequal & Fa & Fb & Fc { Fc = Fa f/ Fb; }
+
+:CMPTUN^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x24 & ieeequal & Fa & Fb & Fc { Fc = zext(Fa f!= Fb); }
+:CMPTEQ^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x25 & ieeequal & Fa & Fb & Fc { Fc = zext(Fa f== Fb); }
+:CMPTLT^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x26 & ieeequal & Fa & Fb & Fc { Fc = zext(Fa f< Fb); }
+:CMPTLE^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x27 & ieeequal & Fa & Fb & Fc { Fc = zext(Fa f<= Fb); }
+
+# IEEE conversions (qualified). Convert-to-integer (CVTTQ) uses the V/SV
+# qualifier family; CVTST uses none//S. fp_lo distinguishes the operation.
+define pcodeop cvt_t_to_s;
+define pcodeop cvt_t_to_q;
+define pcodeop cvt_q_to_s;
+define pcodeop cvt_q_to_t;
+define pcodeop cvt_s_to_t;
+:CVTTS^ieeequal Fb, Fc is opcode=0x16 & fp_lo=0x2c & ieeequal & fa=31 & Fb & Fc { Fc = cvt_t_to_s(Fb); }
+:CVTTQ^cvtqual  Fb, Fc is opcode=0x16 & fp_lo=0x2f & cvtqual  & fa=31 & Fb & Fc { Fc = cvt_t_to_q(Fb); }
+:CVTQS^ieeequal Fb, Fc is opcode=0x16 & fp_lo=0x3c & ieeequal & fa=31 & Fb & Fc { Fc = cvt_q_to_s(Fb); }
+:CVTQT^ieeequal Fb, Fc is opcode=0x16 & fp_lo=0x3e & ieeequal & fa=31 & Fb & Fc { Fc = cvt_q_to_t(Fb); }
+:CVTST^cvstqual Fb, Fc is opcode=0x16 & fp_lo=0x2c & cvstqual & fa=31 & Fb & Fc { Fc = cvt_s_to_t(Fb); }
+
+:ADDF^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x00 & vaxqual & Fa & Fb & Fc { Fc = Fa f+ Fb; }
+:SUBF^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x01 & vaxqual & Fa & Fb & Fc { Fc = Fa f- Fb; }
+:MULF^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x02 & vaxqual & Fa & Fb & Fc { Fc = Fa f* Fb; }
+:DIVF^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x03 & vaxqual & Fa & Fb & Fc { Fc = Fa f/ Fb; }
+:ADDG^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x20 & vaxqual & Fa & Fb & Fc { Fc = Fa f+ Fb; }
+:SUBG^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x21 & vaxqual & Fa & Fb & Fc { Fc = Fa f- Fb; }
+:MULG^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x22 & vaxqual & Fa & Fb & Fc { Fc = Fa f* Fb; }
+:DIVG^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x23 & vaxqual & Fa & Fb & Fc { Fc = Fa f/ Fb; }
+
+:CMPGEQ^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x25 & vaxqual & Fa & Fb & Fc { Fc = zext(Fa f== Fb); }
+:CMPGLT^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x26 & vaxqual & Fa & Fb & Fc { Fc = zext(Fa f< Fb); }
+:CMPGLE^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x27 & vaxqual & Fa & Fb & Fc { Fc = zext(Fa f<= Fb); }
+
+# VAX conversions (qualified). CVTGQ (to integer) uses its own /V family;
+# the others use the VAX U/SU family. CVTQF/CVTQG only define none and /C.
+define pcodeop cvt_d_to_g;
+define pcodeop cvt_g_to_d;
+define pcodeop cvt_g_to_f;
+define pcodeop cvt_g_to_q;
+define pcodeop cvt_q_to_f;
+define pcodeop cvt_q_to_g;
+:CVTDG^vaxqual  Fb, Fc is opcode=0x15 & fp_lo=0x1e & vaxqual  & fa=31 & Fb & Fc { Fc = cvt_d_to_g(Fb); }
+:CVTGD^vaxqual  Fb, Fc is opcode=0x15 & fp_lo=0x2d & vaxqual  & fa=31 & Fb & Fc { Fc = cvt_g_to_d(Fb); }
+:CVTGF^vaxqual  Fb, Fc is opcode=0x15 & fp_lo=0x2c & vaxqual  & fa=31 & Fb & Fc { Fc = cvt_g_to_f(Fb); }
+:CVTGQ^cvtgqual Fb, Fc is opcode=0x15 & fp_lo=0x2f & cvtgqual & fa=31 & Fb & Fc { Fc = cvt_g_to_q(Fb); }
+:CVTQF^vaxqual  Fb, Fc is opcode=0x15 & fp_lo=0x3c & vaxqual  & fa=31 & Fb & Fc { Fc = cvt_q_to_f(Fb); }
+:CVTQG^vaxqual  Fb, Fc is opcode=0x15 & fp_lo=0x3e & vaxqual  & fa=31 & Fb & Fc { Fc = cvt_q_to_g(Fb); }
+
 # set complete bytes to zero
 macro zap(src, dest, bits) {
   dest = src;
