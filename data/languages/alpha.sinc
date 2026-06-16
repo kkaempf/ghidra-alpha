@@ -400,11 +400,13 @@ define pcodeop prefetch;
 :B^icc Ra, disp_pc is bcode=0x3 & is_i=1 & icc     & Ra & disp_pc { if (icc) goto disp_pc; }
 
 # jumps
-:JMP           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 0 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; goto [Rb]; }
-:JSR           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 1 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; call [Rb]; }
+# The target comes from Rbv, the return address is written to Ra; latch the
+# target first since Ra and Rb may be the same register.
+:JMP           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 0 & Ra_lhs  & Rb & hint    { local t=Rb; Ra_lhs = inst_next; goto [t]; }
+:JSR           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 1 & Ra_lhs  & Rb & hint    { local t=Rb; Ra_lhs = inst_next; call [t]; }
 :RET           (Rb)             is opcode=0x1a & jop = 2 & rega=31 & Rb & jdisp=0 { return [Rb]; }
-:RET           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 2 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; return [Rb]; }
-:JSR_COROUTINE Ra_lhs,(Rb),hint is opcode=0x1a & jop = 3 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; call [Rb]; }
+:RET           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 2 & Ra_lhs  & Rb & hint    { local t=Rb; Ra_lhs = inst_next; return [t]; }
+:JSR_COROUTINE Ra_lhs,(Rb),hint is opcode=0x1a & jop = 3 & Ra_lhs  & Rb & hint    { local t=Rb; Ra_lhs = inst_next; call [t]; }
 
 #=========================================================================
 # Integer Arithmetic Instructions
