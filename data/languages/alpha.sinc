@@ -356,7 +356,8 @@ fcc: "GT" is ccode=7 & is_i = 0 & Fa { tmp:1 = (Fa f> 0); export tmp; }
 :LDQ  Ra_lhs, disp_regb is opcode=0x29 & Ra_lhs & disp_regb { Ra_lhs = *disp_regb; }
 :LDWU Ra_lhs, disp_regb is opcode=0x0c & Ra_lhs & disp_regb { Ra_lhs = zext(*:2 disp_regb); }
 
-# load unaligned memory
+# load unaligned memory. ldq_u r31,0(sp) is the canonical UNOP (matches objdump).
+:UNOP is opcode=0x0b & rega=31 & regb=30 & mdisp=0 { }
 :LDQ_U Ra_lhs, disp_regb is opcode=0x0b & Ra_lhs & disp_regb { ptr = disp_regb & ~7; Ra_lhs = *ptr; }
 
 # load memory locked
