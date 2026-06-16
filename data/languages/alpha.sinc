@@ -624,6 +624,25 @@ define pcodeop get_fpcr;
 :FCMOVGT Fa, Fb, Fc is opcode=0x17 & fpfunc=0x02f & Fa & Fb & Fc { cmov(Fa f> 0, Fc, Fb); }
 
 #=========================================================================
+# Integer/Floating moves and square root (opcode 0x14, ITFP)
+#=========================================================================
+
+define pcodeop int_to_float_s;    # ITOFS bit repack
+define pcodeop int_to_float_f;    # ITOFF bit repack
+define pcodeop float_sqrt;
+
+# integer register -> floating register
+:ITOFS Ra, Fc is opcode=0x14 & fpfunc=0x004 & Ra & fb=31 & Fc { Fc = int_to_float_s(Ra); }
+:ITOFF Ra, Fc is opcode=0x14 & fpfunc=0x014 & Ra & fb=31 & Fc { Fc = int_to_float_f(Ra); }
+:ITOFT Ra, Fc is opcode=0x14 & fpfunc=0x024 & Ra & fb=31 & Fc { Fc = Ra; }
+
+# square root (unqualified forms)
+:SQRTF Fb, Fc is opcode=0x14 & fpfunc=0x08a & fa=31 & Fb & Fc { Fc = float_sqrt(Fb); }
+:SQRTG Fb, Fc is opcode=0x14 & fpfunc=0x0aa & fa=31 & Fb & Fc { Fc = float_sqrt(Fb); }
+:SQRTS Fb, Fc is opcode=0x14 & fpfunc=0x08b & fa=31 & Fb & Fc { Fc = float_sqrt(Fb); }
+:SQRTT Fb, Fc is opcode=0x14 & fpfunc=0x0ab & fa=31 & Fb & Fc { Fc = float_sqrt(Fb); }
+
+#=========================================================================
 # set complete bytes to zero
 macro zap(src, dest, bits) {
   dest = src;
