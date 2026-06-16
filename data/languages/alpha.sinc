@@ -547,10 +547,10 @@ macro zap(src, dest, bits) {
 #=========================================================================
 
 # Memory Format Floating-Point Instructions
-:LDF Fa, disp_regb is opcode=0x20 & Fa & disp_regb { Fa = disp_regb; }
-:LDG Fa, disp_regb is opcode=0x21 & Fa & disp_regb { Fa = disp_regb; }
-:LDS Fa, disp_regb is opcode=0x22 & Fa & disp_regb { Fa = disp_regb; }
-:LDT Fa, disp_regb is opcode=0x23 & Fa & disp_regb { Fa = disp_regb; }
+:LDF Fa, disp_regb is opcode=0x20 & Fa & disp_regb { Fa = zext(*:4 disp_regb); }
+:LDG Fa, disp_regb is opcode=0x21 & Fa & disp_regb { Fa = *:8 disp_regb; }
+:LDS Fa, disp_regb is opcode=0x22 & Fa & disp_regb { Fa = zext(*:4 disp_regb); }
+:LDT Fa, disp_regb is opcode=0x23 & Fa & disp_regb { Fa = *:8 disp_regb; }
 
 :STF Fa, disp_regb is opcode=0x24 & Fa & disp_regb { *:4 disp_regb = Fa:4; }
 :STG Fa, disp_regb is opcode=0x25 & Fa & disp_regb { *:8 disp_regb = Fa; }
