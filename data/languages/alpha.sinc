@@ -310,8 +310,10 @@ hdisp_regb: mdisp(Rb) is mdisp & Rb { ptr:8 = Rb + sext(mdisp:2)*65536; export p
 # PC relative displacement
 disp_pc: loc is bdisp [ loc = inst_next + (bdisp << 2); ] { export *[ram]:8 loc; }
 
-# jump hint
-hint:    loc is jdisp [ loc = inst_next + (jdisp << 2); ] { export *[ram]:8 loc; }
+# Branch-prediction hint (predicted target). It does not affect execution,
+# so export it as a constant for display only -- a memory reference here makes
+# Ghidra mark the predicted target as data and corrupts real code there.
+hint:    loc is jdisp [ loc = inst_next + (jdisp << 2); ] { export *[const]:8 loc; }
 
 # arith operand
 op: lit is lit & is_lit = 1 { export *[const]:8 lit; }
