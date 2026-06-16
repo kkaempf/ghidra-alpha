@@ -179,6 +179,7 @@ define token inst (32)
 	hwsdisp   = ( 0, 11) signed # signed displacement of EV6+ HW_LD/HW_ST
 	hwsdisp_ev5 = ( 0,  9) signed # signed displacement of 21164 HW_LD/HW_ST
         ofunc  = ( 5, 11) # operate function
+        fpfunc = ( 5, 15) # floating-point 11-bit function code
 	paltmp = ( 7,  7) # 21064 PAL 19/1D ref to PALtemp
 	abx    = ( 6,  6) # 21064 PAL 19/1D ref to Abox
 	ibx    = ( 5,  5) # 21064 PAL 19/1D ref to Ibox
@@ -590,6 +591,39 @@ define pcodeop float_to_int_s;       # FTOIS register bit repack
 :FTOIT Fa, Rc_lhs is opcode=0x1c & ofunc=0x70 & Fa & regb=31 & Rc_lhs { Rc_lhs = Fa; }
 :FTOIS Fa, Rc_lhs is opcode=0x1c & ofunc=0x78 & Fa & regb=31 & Rc_lhs { Rc_lhs = float_to_int_s(Fa); }
 
+#=========================================================================
+# Independent Floating-Point Instructions (opcode 0x17)
+#=========================================================================
+
+define pcodeop cvt_longword_to_quad;   # CVTLQ
+define pcodeop cvt_quad_to_longword;   # CVTQL
+define pcodeop set_fpcr;
+define pcodeop get_fpcr;
+
+# copy sign / copy sign-and-exponent
+:CPYS  Fa, Fb, Fc is opcode=0x17 & fpfunc=0x020 & Fa & Fb & Fc { Fc = (Fa & 0x8000000000000000) | (Fb & 0x7fffffffffffffff); }
+:CPYSN Fa, Fb, Fc is opcode=0x17 & fpfunc=0x021 & Fa & Fb & Fc { Fc = ((Fa & 0x8000000000000000) ^ 0x8000000000000000) | (Fb & 0x7fffffffffffffff); }
+:CPYSE Fa, Fb, Fc is opcode=0x17 & fpfunc=0x022 & Fa & Fb & Fc { Fc = (Fa & 0xfff0000000000000) | (Fb & 0x000fffffffffffff); }
+
+# longword <-> quadword conversions in float registers
+:CVTLQ      Fb, Fc is opcode=0x17 & fpfunc=0x010 & fa=31 & Fb & Fc { Fc = cvt_longword_to_quad(Fb); }
+:CVTQL      Fb, Fc is opcode=0x17 & fpfunc=0x030 & fa=31 & Fb & Fc { Fc = cvt_quad_to_longword(Fb); }
+:CVTQL^"/V" Fb, Fc is opcode=0x17 & fpfunc=0x130 & fa=31 & Fb & Fc { Fc = cvt_quad_to_longword(Fb); }
+:CVTQL^"/SV" Fb, Fc is opcode=0x17 & fpfunc=0x530 & fa=31 & Fb & Fc { Fc = cvt_quad_to_longword(Fb); }
+
+# FPCR moves (Fa == Fb == Fc by convention)
+:MT_FPCR Fa is opcode=0x17 & fpfunc=0x024 & Fa { set_fpcr(Fa); }
+:MF_FPCR Fa is opcode=0x17 & fpfunc=0x025 & Fa { Fa = get_fpcr(); }
+
+# floating conditional move: move Fb into Fc if Fa meets the test
+:FCMOVEQ Fa, Fb, Fc is opcode=0x17 & fpfunc=0x02a & Fa & Fb & Fc { cmov(Fa f== 0, Fc, Fb); }
+:FCMOVNE Fa, Fb, Fc is opcode=0x17 & fpfunc=0x02b & Fa & Fb & Fc { cmov(Fa f!= 0, Fc, Fb); }
+:FCMOVLT Fa, Fb, Fc is opcode=0x17 & fpfunc=0x02c & Fa & Fb & Fc { cmov(Fa f< 0, Fc, Fb); }
+:FCMOVGE Fa, Fb, Fc is opcode=0x17 & fpfunc=0x02d & Fa & Fb & Fc { cmov(Fa f>= 0, Fc, Fb); }
+:FCMOVLE Fa, Fb, Fc is opcode=0x17 & fpfunc=0x02e & Fa & Fb & Fc { cmov(Fa f<= 0, Fc, Fb); }
+:FCMOVGT Fa, Fb, Fc is opcode=0x17 & fpfunc=0x02f & Fa & Fb & Fc { cmov(Fa f> 0, Fc, Fb); }
+
+#=========================================================================
 # set complete bytes to zero
 macro zap(src, dest, bits) {
   dest = src;
