@@ -402,8 +402,8 @@ define pcodeop prefetch;
 # jumps
 :JMP           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 0 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; goto [Rb]; }
 :JSR           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 1 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; call [Rb]; }
-:RET           (Rb)             is opcode=0x1a & jop = 2 & rega=31 & Rb & jdisp=0 { goto [Rb]; }
-:RET           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 2 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; goto [Rb]; }
+:RET           (Rb)             is opcode=0x1a & jop = 2 & rega=31 & Rb & jdisp=0 { return [Rb]; }
+:RET           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 2 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; return [Rb]; }
 :JSR_COROUTINE Ra_lhs,(Rb),hint is opcode=0x1a & jop = 3 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; call [Rb]; }
 
 #=========================================================================
@@ -878,7 +878,7 @@ define pcodeop call_pal;
 :HW_LD^hwmode rega,hwaddr is opcode=0x1b & hwmode & rega & hwaddr { rega = hwaddr; }
 :HW_ST^hwmode rega,hwaddr is opcode=0x1f & hwmode & rega & hwaddr { hwaddr = rega; }
 # offset 0x320 ==  EXC_ADDR
-:HW_REI             is opcode=0x1e & rega=31 & regb=31 & bit15=1 & bit14=0 { reg:8 = 0x320; ptr:8 = *[register]reg; goto [ptr]; }
+:HW_REI             is opcode=0x1e & rega=31 & regb=31 & bit15=1 & bit14=0 { reg:8 = 0x320; ptr:8 = *[register]reg; return [ptr]; }
 @else # not 21064
 @if defined(21164)
 # EV5 HW_MFPR/HW_MTPR: IPR selected by 16-bit index; model as pcodeops so
