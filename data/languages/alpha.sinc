@@ -583,7 +583,16 @@ define pcodeop hw_mtpr;
 :CALL_PAL pcode is opcode=0x00 & pcode      { reg:8 = 0x358; ptr:8 = inst_next; *[register]reg = ptr; }
 @endif
 @if defined(21264)
-:CALL_PAL pcode is opcode=0x00 & pcode      { nop(); }
+define pcodeop call_pal;
+:CALL_PAL pcode is opcode=0x00 & pcode      { call_pal(pcode:4); }
+@endif
+@if defined(21364)
+define pcodeop call_pal;
+:CALL_PAL pcode is opcode=0x00 & pcode      { call_pal(pcode:4); }
+@endif
+@if defined(21464)
+define pcodeop call_pal;
+:CALL_PAL pcode is opcode=0x00 & pcode      { call_pal(pcode:4); }
 @endif
 
 # 21064: see EC-Q9ZUC-TE pg 95ff
