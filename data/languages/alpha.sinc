@@ -423,9 +423,11 @@ define pcodeop prefetch;
 :CMPULT Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x1d & Ra & op & Rc_lhs { Rc_lhs = zext(Ra < op); }
 
 # count bits
-:CTLZ   Rb, Rc_lhs     is opcode=0x1c & ofunc=0x32 & rega=31 & Rb & Rc_lhs unimpl
-:CTPOP  Rb, Rc_lhs     is opcode=0x1c & ofunc=0x30 & rega=31 & Rb & Rc_lhs unimpl
-:CTTZ   Rb, Rc_lhs     is opcode=0x1c & ofunc=0x33 & rega=31 & Rb & Rc_lhs unimpl
+define pcodeop count_leading_zeros;
+define pcodeop count_trailing_zeros;
+:CTLZ   Rb, Rc_lhs     is opcode=0x1c & ofunc=0x32 & rega=31 & Rb & Rc_lhs { Rc_lhs = count_leading_zeros(Rb); }
+:CTPOP  Rb, Rc_lhs     is opcode=0x1c & ofunc=0x30 & rega=31 & Rb & Rc_lhs { Rc_lhs = popcount(Rb); }
+:CTTZ   Rb, Rc_lhs     is opcode=0x1c & ofunc=0x33 & rega=31 & Rb & Rc_lhs { Rc_lhs = count_trailing_zeros(Rb); }
 
 # multiply
 :MULL      Ra, op, Rc_lhs is opcode=0x13 & ofunc=0x00 & Ra & op & Rc_lhs { Rc_lhs = sext(Ra:4 * op:4); }
