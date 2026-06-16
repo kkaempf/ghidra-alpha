@@ -161,7 +161,8 @@ define token inst (32)
         regb   = (16, 20) # Register b
         mfunc  = ( 0, 15) # memory format with function code
         mdisp  = ( 0, 15) signed dec # memory displacement
-	ipr    = ( 0, 15) # internal processor register (PAL 19/1D)
+	ipr     = ( 0, 15) # 21164 16-bit internal processor register index (PAL 19/1D)
+	ipr_ev6 = ( 8, 15) # 21264+ 8-bit internal processor register index (PAL 19/1D)
         jop    = (14, 15) # jump opcode
         jdisp  = ( 0, 13) signed # jump displacement
         sbz    = (13, 15) # should be zero
@@ -174,12 +175,13 @@ define token inst (32)
 	alt    = (14, 14) # HW ALT_MODE ?
 	rwc    = (13, 13) # HW read-with-write check
 	qw     = (12, 12) # HW quad word ?
-	hwdisp = ( 0, 11) # displacement of 21064 HW_LD/HW_ST
+	hwdisp    = ( 0, 11) # displacement of 21064 HW_LD/HW_ST
+	hwsdisp   = ( 0, 11) signed # signed displacement of EV6+ HW_LD/HW_ST
+	hwsdisp_ev5 = ( 0,  9) signed # signed displacement of 21164 HW_LD/HW_ST
         ofunc  = ( 5, 11) # operate function
 	paltmp = ( 7,  7) # 21064 PAL 19/1D ref to PALtemp
 	abx    = ( 6,  6) # 21064 PAL 19/1D ref to Abox
 	ibx    = ( 5,  5) # 21064 PAL 19/1D ref to Ibox
-	pdisp  = ( 0,  9) signed # pal displacement
         regc   = ( 0,  4) # Register c
 	ibox   = ( 0,  4) # 21064 PAL 19/1D Ibox register
 	abox   = ( 0,  4) # 21064 PAL 19/1D Abox register
@@ -307,12 +309,6 @@ disp_pc: loc is bdisp [ loc = inst_next + (bdisp << 2); ] { export *[ram]:8 loc;
 
 # jump hint
 hint:    loc is jdisp [ loc = inst_next + (jdisp << 2); ] { export *[ram]:8 loc; }
-
-@if defined(21064)
-@else
-# PAL 1B displacement
-paldisp: pdisp(Rb) is pdisp & Rb  { ptr:8 = Rb + sext(pdisp:2); export ptr; }
-@endif
 
 # arith operand
 op: lit is lit & is_lit = 1 { export *[const]:8 lit; }
@@ -569,6 +565,8 @@ macro zap(src, dest, bits) {
 #=========================================================================
 
 define pcodeop nop;
+define pcodeop hw_mfpr;
+define pcodeop hw_mtpr;
 
 :AMASK op, Rc_lhs is opcode=0x11 & ofunc=0x61 & op & Rc_lhs { Rc_lhs = op; }
 
@@ -611,12 +609,37 @@ define pcodeop nop;
 # offset 0x320 ==  EXC_ADDR
 :HW_REI             is opcode=0x1e & rega=31 & regb=31 & bit15=1 & bit14=0 { reg:8 = 0x320; ptr:8 = *[register]reg; goto [ptr]; }
 @else # not 21064
-:HW_MTPR Ra         is opcode=0x1d & Ra { nop(); }
-:HW_MFPR pcode      is opcode=0x19 & pcode { nop(); }
-:HW_REI             is opcode=0x1e & bit15=1 & bit14=0 { nop(); }
-# 21164 :HW_REI pcode      is opcode=0x1e & pcode { reg:8 = 0x358; ptr:8 = *[register]reg; goto [ptr]; }
-:HW_LD rega,paldisp is opcode=0x1b & rega & paldisp { nop(); }
-:HW_ST pcode        is opcode=0x1f & pcode { nop(); }
+@if defined(21164)
+# EV5 HW_MFPR/HW_MTPR: IPR selected by 16-bit index; model as pcodeops so
+# dataflow (e.g. r22 = hw_mfpr(<ipr>)) is visible in the decompiler.
+:HW_MFPR rega, ipr is opcode=0x19 & rega & ipr { rega = hw_mfpr(ipr:2); }
+:HW_MTPR rega, ipr is opcode=0x1d & rega & ipr { hw_mtpr(ipr:2, rega); }
+# offset 0x358 == EXC_ADDR; TYP[15:14]: 10=normal, 11=stall
+:HW_REI          is opcode=0x1e & bit15=1 & bit14=0 { reg:8 = 0x358; ptr:8 = *[register]reg; return [ptr]; }
+:HW_REI^"/stall" is opcode=0x1e & bit15=1 & bit14=1 { reg:8 = 0x358; ptr:8 = *[register]reg; return [ptr]; }
+@else # EV6+
+# EV6+ HW_MFPR/HW_MTPR: IPR selected by 8-bit index (bits 15:8); bits 7:0 are
+# scoreboard mask. Model as pcodeops so dataflow is visible in the decompiler.
+:HW_MFPR rega, ipr_ev6   is opcode=0x19 & rega & ipr_ev6 { rega = hw_mfpr(ipr_ev6:1); }
+:HW_MTPR Rb,   ipr_ev6   is opcode=0x1d & Rb   & ipr_ev6 { hw_mtpr(ipr_ev6:1, Rb); }
+# EV6+ opcode 0x1e is HW_RET (not HW_REI): target PC comes from RB, not EXC_ADDR.
+# HINT[15:14]: 00=JMP, 01=JSR, 10=RET, 11=COROUTINE; bit[13]=STALL (pipeline only).
+:HW_JMP       (Rb) is opcode=0x1e & Rb & bit15=0 & bit14=0 { goto [Rb]; }
+:HW_JSR       (Rb) is opcode=0x1e & Rb & bit15=0 & bit14=1 { call [Rb]; }
+:HW_RET       (Rb) is opcode=0x1e & Rb & bit15=1 & bit14=0 { return [Rb]; }
+:HW_COROUTINE (Rb) is opcode=0x1e & Rb & bit15=1 & bit14=1 { call [Rb]; }
+@endif
+@if defined(21164)
+# EV5 HW_LD/HW_ST: Rb + signed 10-bit displacement; mode flags in bits 15:10
+hwaddr_ev5: hwsdisp_ev5(Rb) is hwsdisp_ev5 & Rb { d:2 = hwsdisp_ev5; ptr = Rb + sext(d); export *[ram]:8 ptr; }
+:HW_LD rega, hwaddr_ev5 is opcode=0x1b & rega & hwaddr_ev5 { rega = hwaddr_ev5; }
+:HW_ST rega, hwaddr_ev5 is opcode=0x1f & rega & hwaddr_ev5 { hwaddr_ev5 = rega; }
+@else
+# EV6+ HW_LD/HW_ST: Rb + signed 12-bit displacement; mode in bits 15:12
+hwaddr_ev: hwsdisp(Rb) is hwsdisp & Rb { d:2 = hwsdisp; ptr = Rb + sext(d); export *[ram]:8 ptr; }
+:HW_LD rega, hwaddr_ev is opcode=0x1b & rega & hwaddr_ev { rega = hwaddr_ev; }
+:HW_ST rega, hwaddr_ev is opcode=0x1f & rega & hwaddr_ev { hwaddr_ev = rega; }
+@endif
 @endif
 
 # cache hints
