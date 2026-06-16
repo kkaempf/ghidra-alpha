@@ -537,6 +537,59 @@ macro msk_h(rav, pos, rc, mask) { local sh:8 = (pos & 7) << 3; local m:16 = zext
 :SEXTB op, Rc_lhs is opcode=0x1c & ofunc=0x00 & rega=31 & op & Rc_lhs { Rc_lhs = sext(op:1); }
 :SEXTW op, Rc_lhs is opcode=0x1c & ofunc=0x01 & rega=31 & op & Rc_lhs { Rc_lhs = sext(op:2); }
 
+#=========================================================================
+# Multimedia (MVI) and FIX extensions (opcode 0x1c)
+#=========================================================================
+
+# SIMD byte/word ops: per-element semantics are not expanded, so model them as
+# pcodeops that take the two source quadwords and produce the packed result.
+define pcodeop pixel_error;          # PERR  (sum of |byte differences|)
+define pcodeop min_signed_bytes;
+define pcodeop min_signed_words;
+define pcodeop min_unsigned_bytes;
+define pcodeop min_unsigned_words;
+define pcodeop max_signed_bytes;
+define pcodeop max_signed_words;
+define pcodeop max_unsigned_bytes;
+define pcodeop max_unsigned_words;
+define pcodeop float_to_int_s;       # FTOIS register bit repack
+
+:PERR   Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x31 & Ra & op & Rc_lhs { Rc_lhs = pixel_error(Ra, op); }
+:MINSB8 Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x38 & Ra & op & Rc_lhs { Rc_lhs = min_signed_bytes(Ra, op); }
+:MINSW4 Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x39 & Ra & op & Rc_lhs { Rc_lhs = min_signed_words(Ra, op); }
+:MINUB8 Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x3a & Ra & op & Rc_lhs { Rc_lhs = min_unsigned_bytes(Ra, op); }
+:MINUW4 Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x3b & Ra & op & Rc_lhs { Rc_lhs = min_unsigned_words(Ra, op); }
+:MAXUB8 Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x3c & Ra & op & Rc_lhs { Rc_lhs = max_unsigned_bytes(Ra, op); }
+:MAXUW4 Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x3d & Ra & op & Rc_lhs { Rc_lhs = max_unsigned_words(Ra, op); }
+:MAXSB8 Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x3e & Ra & op & Rc_lhs { Rc_lhs = max_signed_bytes(Ra, op); }
+:MAXSW4 Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x3f & Ra & op & Rc_lhs { Rc_lhs = max_signed_words(Ra, op); }
+
+# unpack low bytes to words / longwords; pack low byte of each word / longword
+:UNPKBW Rb, Rc_lhs is opcode=0x1c & ofunc=0x34 & rega=31 & Rb & Rc_lhs {
+  local r:8 = 0;
+  r[0,8] = Rb[0,8]; r[16,8] = Rb[8,8]; r[32,8] = Rb[16,8]; r[48,8] = Rb[24,8];
+  Rc_lhs = r;
+}
+:UNPKBL Rb, Rc_lhs is opcode=0x1c & ofunc=0x35 & rega=31 & Rb & Rc_lhs {
+  local r:8 = 0;
+  r[0,8] = Rb[0,8]; r[32,8] = Rb[8,8];
+  Rc_lhs = r;
+}
+:PKWB Rb, Rc_lhs is opcode=0x1c & ofunc=0x36 & rega=31 & Rb & Rc_lhs {
+  local r:8 = 0;
+  r[0,8] = Rb[0,8]; r[8,8] = Rb[16,8]; r[16,8] = Rb[32,8]; r[24,8] = Rb[48,8];
+  Rc_lhs = r;
+}
+:PKLB Rb, Rc_lhs is opcode=0x1c & ofunc=0x37 & rega=31 & Rb & Rc_lhs {
+  local r:8 = 0;
+  r[0,8] = Rb[0,8]; r[8,8] = Rb[32,8];
+  Rc_lhs = r;
+}
+
+# FIX: move S/T float register to integer register
+:FTOIT Fa, Rc_lhs is opcode=0x1c & ofunc=0x70 & Fa & regb=31 & Rc_lhs { Rc_lhs = Fa; }
+:FTOIS Fa, Rc_lhs is opcode=0x1c & ofunc=0x78 & Fa & regb=31 & Rc_lhs { Rc_lhs = float_to_int_s(Fa); }
+
 # set complete bytes to zero
 macro zap(src, dest, bits) {
   dest = src;
