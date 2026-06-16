@@ -522,14 +522,16 @@ macro ins_h(rav, pos, rc, mask) { local sh:8 = (pos & 7) << 3; local t:16 = zext
 :INSLH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x67 & Ra & op & Rc_lhs { ins_h(Ra, op, Rc_lhs, 0xffffffff:8); }
 :INSQH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x77 & Ra & op & Rc_lhs { ins_h(Ra, op, Rc_lhs, 0xffffffffffffffff:8); }
 
-# byte mask
-:MSKBL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x02 & Ra & op & Rc_lhs unimpl
-:MSKWL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x12 & Ra & op & Rc_lhs unimpl
-:MSKLL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x22 & Ra & op & Rc_lhs unimpl
-:MSKQL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x32 & Ra & op & Rc_lhs unimpl
-:MSKWH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x52 & Ra & op & Rc_lhs unimpl
-:MSKLH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x62 & Ra & op & Rc_lhs unimpl
-:MSKQH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x72 & Ra & op & Rc_lhs unimpl
+# byte mask. msk_l clears the field within the low quadword, msk_h the high.
+macro msk_l(rav, pos, rc, mask) { local sh:8 = (pos & 7) << 3; local m:16 = zext(mask) << sh; rc = rav & ~(m:8); }
+macro msk_h(rav, pos, rc, mask) { local sh:8 = (pos & 7) << 3; local m:16 = zext(mask) << sh; m = m >> 64; rc = rav & ~(m:8); }
+:MSKBL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x02 & Ra & op & Rc_lhs { msk_l(Ra, op, Rc_lhs, 0xff:8); }
+:MSKWL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x12 & Ra & op & Rc_lhs { msk_l(Ra, op, Rc_lhs, 0xffff:8); }
+:MSKLL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x22 & Ra & op & Rc_lhs { msk_l(Ra, op, Rc_lhs, 0xffffffff:8); }
+:MSKQL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x32 & Ra & op & Rc_lhs { msk_l(Ra, op, Rc_lhs, 0xffffffffffffffff:8); }
+:MSKWH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x52 & Ra & op & Rc_lhs { msk_h(Ra, op, Rc_lhs, 0xffff:8); }
+:MSKLH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x62 & Ra & op & Rc_lhs { msk_h(Ra, op, Rc_lhs, 0xffffffff:8); }
+:MSKQH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x72 & Ra & op & Rc_lhs { msk_h(Ra, op, Rc_lhs, 0xffffffffffffffff:8); }
 
 # sign extend
 :SEXTB op, Rc_lhs is opcode=0x1c & ofunc=0x00 & rega=31 & op & Rc_lhs { Rc_lhs = sext(op:1); }
