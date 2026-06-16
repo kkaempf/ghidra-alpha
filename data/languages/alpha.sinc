@@ -499,14 +499,17 @@ macro cmov(condition,reg,val) {
   Rc_lhs = zext(r);
 }
 
-# extract byte
-:EXTBL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x06 & Ra & op & Rc_lhs unimpl
-:EXTWL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x16 & Ra & op & Rc_lhs unimpl
-:EXTLL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x26 & Ra & op & Rc_lhs unimpl
-:EXTQL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x36 & Ra & op & Rc_lhs unimpl
-:EXTWH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x5a & Ra & op & Rc_lhs unimpl
-:EXTLH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x6a & Ra & op & Rc_lhs unimpl
-:EXTQH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x7a & Ra & op & Rc_lhs unimpl
+# extract byte. Byte position = op<2:0>, shift = pos*8 bits. The 128-bit temp
+# in ext_h makes the high half fall out and avoids shift-by-64 when pos==0.
+macro ext_l(rav, pos, rc, mask) { local sh:8 = (pos & 7) << 3; rc = (rav >> sh) & mask; }
+macro ext_h(rav, pos, rc, mask) { local sh:8 = (pos & 7) << 3; local n:8 = 64 - sh; local t:16 = zext(rav) << n; rc = t:8 & mask; }
+:EXTBL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x06 & Ra & op & Rc_lhs { ext_l(Ra, op, Rc_lhs, 0xff:8); }
+:EXTWL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x16 & Ra & op & Rc_lhs { ext_l(Ra, op, Rc_lhs, 0xffff:8); }
+:EXTLL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x26 & Ra & op & Rc_lhs { ext_l(Ra, op, Rc_lhs, 0xffffffff:8); }
+:EXTQL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x36 & Ra & op & Rc_lhs { ext_l(Ra, op, Rc_lhs, 0xffffffffffffffff:8); }
+:EXTWH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x5a & Ra & op & Rc_lhs { ext_h(Ra, op, Rc_lhs, 0xffff:8); }
+:EXTLH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x6a & Ra & op & Rc_lhs { ext_h(Ra, op, Rc_lhs, 0xffffffff:8); }
+:EXTQH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x7a & Ra & op & Rc_lhs { ext_h(Ra, op, Rc_lhs, 0xffffffffffffffff:8); }
 
 # byte insert
 :INSBL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x0b & Ra & op & Rc_lhs unimpl
