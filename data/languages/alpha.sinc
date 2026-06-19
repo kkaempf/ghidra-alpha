@@ -175,7 +175,7 @@ define token inst (32)
 	alt    = (14, 14) # HW ALT_MODE ?
 	rwc    = (13, 13) # HW read-with-write check
 	qw     = (12, 12) # HW quad word ?
-	hwdisp    = ( 0, 11) # displacement of 21064 HW_LD/HW_ST
+	hwdisp    = ( 0, 11) signed # displacement of 21064 HW_LD/HW_ST
 	hwsdisp   = ( 0, 11) signed # signed displacement of EV6+ HW_LD/HW_ST
 	hwsdisp_ev5 = ( 0,  9) signed # signed displacement of 21164 HW_LD/HW_ST
         ofunc  = ( 5, 11) # operate function
@@ -269,8 +269,8 @@ Fc: fc is fc { export fc; }
 Ix: ibox is ibox { tmp:8 = ibox; export tmp; }
 Ax: abox is abox { tmp:8 = abox; export tmp; }
 Temp: tmpidx is tmpidx { tmp = tmpidx; export tmp; }
-hwaddr: hwdisp(Rb) is hwdisp & Rb & qw=0 { d:2 = hwdisp & 0xffe; ptr = Rb + sext(d); export *[ram]:8 ptr; }
-hwaddr: hwdisp(Rb) is hwdisp & Rb & qw=1 { d:2 = hwdisp & 0xffc; ptr = Rb + sext(d); export *[ram]:8 ptr; }
+hwaddr: hwdisp(Rb) is hwdisp & Rb & qw=0 { ptr = (Rb + hwdisp) & ~1; export *[ram]:8 ptr; }
+hwaddr: hwdisp(Rb) is hwdisp & Rb & qw=1 { ptr = (Rb + hwdisp) & ~3; export *[ram]:8 ptr; }
 hwmode: ".l/vir"         is phy=0 & alt=0 & rwc=0 & qw=0 { export 0:8; }
 hwmode: ".q/vir"         is phy=0 & alt=0 & rwc=0 & qw=1 { export 0:8; }
 hwmode: ".l/vir/rwc"     is phy=0 & alt=0 & rwc=1 & qw=0 { export 0:8; }
