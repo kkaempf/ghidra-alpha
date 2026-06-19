@@ -257,8 +257,8 @@ attach variables [ ldst ] [   _    l    v    lv    q    lq    vq    lvq
 # Tables
 
 # registers - left-hand-side (assignment)
-Ra_lhs: rega is rega { tmp = rega; export tmp; }
-Rc_lhs: regc is regc { tmp = regc; export tmp; }
+Ra_lhs: rega is rega { export rega; }
+Rc_lhs: regc is regc { export regc; }
 
 Ra: rega is rega { tmp = rega; export tmp; }
 Rb: regb is regb { tmp = regb; export tmp; }
