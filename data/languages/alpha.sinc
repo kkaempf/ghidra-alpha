@@ -155,16 +155,19 @@ define token inst (32)
         pcode  = ( 0, 25) dec # Palcode
         rega   = (21, 25) # Register a
         fa     = (21, 25) # Floating-Point Register a
+        fb     = (16, 20) # Floating-Point Register b
+        fc     = ( 0,  4) # Floating-Point Register c
         bdisp  = ( 0, 20) signed # branch displacement
         regb   = (16, 20) # Register b
         mfunc  = ( 0, 15) # memory format with function code
         mdisp  = ( 0, 15) signed dec # memory displacement
-	ipr    = ( 0, 15) # internal processor register (PAL 19/1D)
+	ipr     = ( 0, 15) # 21164 16-bit internal processor register index (PAL 19/1D)
+	ipr_ev6 = ( 8, 15) # 21264+ 8-bit internal processor register index (PAL 19/1D)
         jop    = (14, 15) # jump opcode
         jdisp  = ( 0, 13) signed # jump displacement
         sbz    = (13, 15) # should be zero
         ldst   = (10, 15) # PAL load/store flags
-        lit    = (13, 20) signed dec # literal
+        lit    = (13, 20) dec # literal (8-bit, zero-extended)
         is_lit = (12, 12) # bit 12: 0->SBZ, 1->LIT
 	bit15  = (15, 15) # for HW_REI
 	phy    = (15, 15) # HW physical(1)/virtual(0) access
@@ -172,12 +175,16 @@ define token inst (32)
 	alt    = (14, 14) # HW ALT_MODE ?
 	rwc    = (13, 13) # HW read-with-write check
 	qw     = (12, 12) # HW quad word ?
-	hwdisp = ( 0, 11) # displacement of 21064 HW_LD/HW_ST
+	hwdisp    = ( 0, 11) signed # displacement of 21064 HW_LD/HW_ST
+	hwsdisp   = ( 0, 11) signed # signed displacement of EV6+ HW_LD/HW_ST
+	hwsdisp_ev5 = ( 0,  9) signed # signed displacement of 21164 HW_LD/HW_ST
         ofunc  = ( 5, 11) # operate function
+        fpfunc = ( 5, 15) # floating-point 11-bit function code
+        fp_lo  = ( 5, 10) # FP function code <5:0>  (operation + precision)
+        fp_hi  = (11, 15) # FP function code <10:6> (round/trap qualifier)
 	paltmp = ( 7,  7) # 21064 PAL 19/1D ref to PALtemp
 	abx    = ( 6,  6) # 21064 PAL 19/1D ref to Abox
 	ibx    = ( 5,  5) # 21064 PAL 19/1D ref to Ibox
-	pdisp  = ( 0,  9) signed # pal displacement
         regc   = ( 0,  4) # Register c
 	ibox   = ( 0,  4) # 21064 PAL 19/1D Ibox register
 	abox   = ( 0,  4) # 21064 PAL 19/1D Abox register
@@ -190,14 +197,14 @@ define token inst (32)
 @if defined(VMS)
 attach variables [ rega regb regc ] [ R0  R1  R2  R3  R4  R5  R6  R7  R8  R9  R10 R11 R12 R13 R14 R15
                                       R16 R17 R18 R19 R20 R21 R22 R23 R24 AI  RA  PV  R28 FP  SP  RZ ];
-attach variables [ fa ]   [ F0  F1  F2  F3  F4  F5  F6  F7  F8  F9  F10 F11 F12 F13 F14 F15
+attach variables [ fa fb fc ]   [ F0  F1  F2  F3  F4  F5  F6  F7  F8  F9  F10 F11 F12 F13 F14 F15
                             F16 F17 F18 F19 F20 F21 F22 F23 F24 F25 F26 F27 F28 F29 F30 FZ ];
 @endif
 
 @if defined(UNIX)
 attach variables [ rega regb regc ] [ v0  t0  t1  t2  t3  t4  t5  t6  t7  s0  s1  s2  s3  s4  s5  FP
                                       a0  a1  a2  a3  a4  a5  t8  t9  t10 t11 ra  pv  at  GP  SP  zero ];
-attach variables [ fa ]   [ f0  f1  f2  f3  f4  f5  f6  f7  f8  f9  f10 f11 f12 f13 f14 f15
+attach variables [ fa fb fc ]   [ f0  f1  f2  f3  f4  f5  f6  f7  f8  f9  f10 f11 f12 f13 f14 f15
                             f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 fzero ];
 @endif
 
@@ -206,7 +213,7 @@ attach variables [ fa ]   [ f0  f1  f2  f3  f4  f5  f6  f7  f8  f9  f10 f11 f12 
 # names according to Alpha Architecture Reference, II-C
 attach variables [ rega regb regc ] [ v0  t0  t1  t2  t3  t4  t5  t6  t7  s0  s1  s2  s3  s4  s5  fp
                                       a0  a1  a2  a3  a4  a5  t8  t9  t10 t11 ra  t12 at  gp  sp  zero ];
-attach variables [ fa ]   [ f0  f1  f2  f3  f4  f5  f6  f7  f8  f9  f10 f11 f12 f13 f14 f15
+attach variables [ fa fb fc ]   [ f0  f1  f2  f3  f4  f5  f6  f7  f8  f9  f10 f11 f12 f13 f14 f15
                             f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 fzero ];
 @endif
 
@@ -250,18 +257,20 @@ attach variables [ ldst ] [   _    l    v    lv    q    lq    vq    lvq
 # Tables
 
 # registers - left-hand-side (assignment)
-Ra_lhs: rega is rega { tmp = rega; export tmp; }
-Rc_lhs: regc is regc { tmp = regc; export tmp; }
+Ra_lhs: rega is rega { export rega; }
+Rc_lhs: regc is regc { export regc; }
 
 Ra: rega is rega { tmp = rega; export tmp; }
 Rb: regb is regb { tmp = regb; export tmp; }
-Fa: rega is rega { tmp = rega; export tmp; }
+Fa: fa is fa { export fa; }
+Fb: fb is fb { export fb; }
+Fc: fc is fc { export fc; }
 @if defined(21064)
 Ix: ibox is ibox { tmp:8 = ibox; export tmp; }
 Ax: abox is abox { tmp:8 = abox; export tmp; }
 Temp: tmpidx is tmpidx { tmp = tmpidx; export tmp; }
-hwaddr: hwdisp(Rb) is hwdisp & Rb & qw=0 { d:2 = hwdisp & 0xffe; ptr = Rb + sext(d); export *[ram]:8 ptr; }
-hwaddr: hwdisp(Rb) is hwdisp & Rb & qw=1 { d:2 = hwdisp & 0xffc; ptr = Rb + sext(d); export *[ram]:8 ptr; }
+hwaddr: hwdisp(Rb) is hwdisp & Rb & qw=0 { ptr = (Rb + hwdisp) & ~1; export *[ram]:8 ptr; }
+hwaddr: hwdisp(Rb) is hwdisp & Rb & qw=1 { ptr = (Rb + hwdisp) & ~3; export *[ram]:8 ptr; }
 hwmode: ".l/vir"         is phy=0 & alt=0 & rwc=0 & qw=0 { export 0:8; }
 hwmode: ".q/vir"         is phy=0 & alt=0 & rwc=0 & qw=1 { export 0:8; }
 hwmode: ".l/vir/rwc"     is phy=0 & alt=0 & rwc=1 & qw=0 { export 0:8; }
@@ -280,13 +289,13 @@ hwmode: ".l/phy/alt/rwc" is phy=1 & alt=1 & rwc=1 & qw=0 { export 0:8; }
 hwmode: ".q/phy/alt/rwc" is phy=1 & alt=1 & rwc=1 & qw=1 { export 0:8; }
 @endif
 @if defined(VMS)
-Fa: FZ is rega=31 & FZ { export  0:8; }
+Fa: FZ is fa=31 & FZ { export  0:8; }
 Ra: RZ is rega=31 & RZ { export  0:8; }
 Rb: RZ is regb=31 & RZ { export  0:8; }
 @else
 Ra: zero is rega=31 & zero   { export 0:8; }
 Rb: zero is regb=31 & zero   { export 0:8; }
-Fa: fzero is rega=31 & fzero { export  0:8; }
+Fa: fzero is fa=31 & fzero { export  0:8; }
 @endif
 
 # LDAx
@@ -301,14 +310,10 @@ hdisp_regb: mdisp(Rb) is mdisp & Rb { ptr:8 = Rb + sext(mdisp:2)*65536; export p
 # PC relative displacement
 disp_pc: loc is bdisp [ loc = inst_next + (bdisp << 2); ] { export *[ram]:8 loc; }
 
-# jump hint
-hint:    loc is jdisp [ loc = inst_next + (jdisp << 2); ] { export *[ram]:8 loc; }
-
-@if defined(21064)
-@else
-# PAL 1B displacement
-paldisp: pdisp(Rb) is pdisp & Rb  { ptr:8 = Rb + sext(pdisp:2); export ptr; }
-@endif
+# Branch-prediction hint (predicted target). It does not affect execution,
+# so export it as a constant for display only -- a memory reference here makes
+# Ghidra mark the predicted target as data and corrupts real code there.
+hint:    loc is jdisp [ loc = inst_next + (jdisp << 2); ] { export *[const]:8 loc; }
 
 # arith operand
 op: lit is lit & is_lit = 1 { export *[const]:8 lit; }
@@ -351,12 +356,13 @@ fcc: "GT" is ccode=7 & is_i = 0 & Fa { tmp:1 = (Fa f> 0); export tmp; }
 :LDQ  Ra_lhs, disp_regb is opcode=0x29 & Ra_lhs & disp_regb { Ra_lhs = *disp_regb; }
 :LDWU Ra_lhs, disp_regb is opcode=0x0c & Ra_lhs & disp_regb { Ra_lhs = zext(*:2 disp_regb); }
 
-# load unaligned memory
+# load unaligned memory. ldq_u r31,0(sp) is the canonical UNOP (matches objdump).
+:UNOP is opcode=0x0b & rega=31 & regb=30 & mdisp=0 { }
 :LDQ_U Ra_lhs, disp_regb is opcode=0x0b & Ra_lhs & disp_regb { ptr = disp_regb & ~7; Ra_lhs = *ptr; }
 
 # load memory locked
 :LDL_L  Ra_lhs, disp_regb is opcode=0x2a & Ra_lhs & disp_regb { Ra_lhs = sext(*:4 disp_regb); }
-:LDQ_L  Ra_lhs, disp_regb is opcode=0x2b & Ra_lhs & disp_regb { Ra_lhs = disp_regb; }
+:LDQ_L  Ra_lhs, disp_regb is opcode=0x2b & Ra_lhs & disp_regb { Ra_lhs = *disp_regb; }
 
 # store to memory conditional
 :STL_C  Ra, disp_regb is opcode=0x2e & Ra & disp_regb { *:4 disp_regb = Ra:4; }
@@ -371,6 +377,14 @@ fcc: "GT" is ccode=7 & is_i = 0 & Fa { tmp:1 = (Fa f> 0); export tmp; }
 # store to unaligned
 :STQ_U  Ra, disp_regb is opcode=0x0f & Ra & disp_regb { ptr = disp_regb & ~7; *ptr = Ra; }
 
+# Prefetch hints: load instructions with the destination register set to 31.
+# More-constrained than the plain loads, so they take precedence.
+define pcodeop prefetch;
+:PREFETCH     disp_regb is opcode=0x28 & rega=31 & disp_regb { prefetch(disp_regb); }
+:PREFETCH_EN  disp_regb is opcode=0x29 & rega=31 & disp_regb { prefetch(disp_regb); }
+:PREFETCH_M   disp_regb is opcode=0x22 & fa=31 & disp_regb { prefetch(disp_regb); }
+:PREFETCH_MEN disp_regb is opcode=0x23 & fa=31 & disp_regb { prefetch(disp_regb); }
+
 #=========================================================================
 # Control Instructions
 #=========================================================================
@@ -382,22 +396,26 @@ fcc: "GT" is ccode=7 & is_i = 0 & Fa { tmp:1 = (Fa f> 0); export tmp; }
 :BSR  Ra_lhs, disp_pc is opcode=0x34 & Ra_lhs  & disp_pc { Ra_lhs = inst_next; call disp_pc; }
 
 # PC-relative branch conditional
-:BLBC  Ra, disp_pc is bcode=0x3 & is_i=1 & ccode=0 & Ra & disp_pc { Bexpr(Ra, Ra:1 ^ 1, disp_pc); }
-:BLBS  Ra, disp_pc is bcode=0x3 & is_i=1 & ccode=4 & Ra & disp_pc { Bexpr(Ra, Ra:1 & 1, disp_pc); }
+:BLBC  Ra, disp_pc is bcode=0x3 & is_i=1 & ccode=0 & Ra & disp_pc { if ((Ra & 1) == 0) goto disp_pc; }
+:BLBS  Ra, disp_pc is bcode=0x3 & is_i=1 & ccode=4 & Ra & disp_pc { if ((Ra & 1) != 0) goto disp_pc; }
 :B^icc Ra, disp_pc is bcode=0x3 & is_i=1 & icc     & Ra & disp_pc { if (icc) goto disp_pc; }
 
 # jumps
-:JMP           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 0 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; goto [Rb]; }
-:JSR           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 1 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; call [Rb]; }
-:RET           (Rb)             is opcode=0x1a & jop = 2 & rega=31 & Rb & jdisp=0 { goto [Rb]; }
-:RET           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 2 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; goto [Rb]; }
-:JSR_COROUTINE Ra_lhs,(Rb),hint is opcode=0x1a & jop = 3 & Ra_lhs  & Rb & hint    { Ra_lhs = inst_next; call [Rb]; }
+# The target comes from Rbv, the return address is written to Ra; latch the
+# target first since Ra and Rb may be the same register.
+:JMP           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 0 & Ra_lhs  & Rb & hint    { local t=Rb; Ra_lhs = inst_next; goto [t]; }
+:JSR           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 1 & Ra_lhs  & Rb & hint    { local t=Rb; Ra_lhs = inst_next; call [t]; }
+:RET                            is opcode=0x1a & jop = 2 & rega=31 & regb=26 & Rb & jdisp=1 { return [Rb]; }
+:RET           (Rb)             is opcode=0x1a & jop = 2 & rega=31 & Rb & jdisp=0 { return [Rb]; }
+:RET           Ra_lhs,(Rb),hint is opcode=0x1a & jop = 2 & Ra_lhs  & Rb & hint    { local t=Rb; Ra_lhs = inst_next; return [t]; }
+:JSR_COROUTINE Ra_lhs,(Rb),hint is opcode=0x1a & jop = 3 & Ra_lhs  & Rb & hint    { local t=Rb; Ra_lhs = inst_next; call [t]; }
 
 #=========================================================================
 # Integer Arithmetic Instructions
 #=========================================================================
 
 # add
+:SEXTL      op, Rc_lhs is opcode=0x10 & ofunc=0x00 & rega=31 & op & Rc_lhs { Rc_lhs = sext(op:4); }
 :ADDL   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x00 & Ra & op & Rc_lhs { tmp = Ra:4 + op:4; Rc_lhs = sext(tmp); }
 :ADDL^"/V"   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x40 & Ra & op & Rc_lhs { tmp = Ra:4 + op:4; Rc_lhs = sext(tmp); }
 :S4ADDL Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x02 & Ra & op & Rc_lhs { tmp = Ra:4 << 2; tmp = tmp + op:4; Rc_lhs = sext(tmp); }
@@ -415,9 +433,11 @@ fcc: "GT" is ccode=7 & is_i = 0 & Fa { tmp:1 = (Fa f> 0); export tmp; }
 :CMPULT Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x1d & Ra & op & Rc_lhs { Rc_lhs = zext(Ra < op); }
 
 # count bits
-:CTLZ   Rb, Rc_lhs     is opcode=0x1c & ofunc=0x32 & rega=31 & Rb & Rc_lhs unimpl
-:CTPOP  Rb, Rc_lhs     is opcode=0x1c & ofunc=0x30 & rega=31 & Rb & Rc_lhs unimpl
-:CTTZ   Rb, Rc_lhs     is opcode=0x1c & ofunc=0x33 & rega=31 & Rb & Rc_lhs unimpl
+define pcodeop count_leading_zeros;
+define pcodeop count_trailing_zeros;
+:CTLZ   Rb, Rc_lhs     is opcode=0x1c & ofunc=0x32 & rega=31 & Rb & Rc_lhs { Rc_lhs = count_leading_zeros(Rb); }
+:CTPOP  Rb, Rc_lhs     is opcode=0x1c & ofunc=0x30 & rega=31 & Rb & Rc_lhs { Rc_lhs = popcount(Rb); }
+:CTTZ   Rb, Rc_lhs     is opcode=0x1c & ofunc=0x33 & rega=31 & Rb & Rc_lhs { Rc_lhs = count_trailing_zeros(Rb); }
 
 # multiply
 :MULL      Ra, op, Rc_lhs is opcode=0x13 & ofunc=0x00 & Ra & op & Rc_lhs { Rc_lhs = sext(Ra:4 * op:4); }
@@ -427,10 +447,12 @@ fcc: "GT" is ccode=7 & is_i = 0 & Fa { tmp:1 = (Fa f> 0); export tmp; }
 :UMULH     Ra, op, Rc_lhs is opcode=0x13 & ofunc=0x30 & Ra & op & Rc_lhs { tmp:16 = zext(Ra) * zext(op); tmp = (tmp >> 64); Rc_lhs = tmp:8; }
 
 # subtract
+:NEGL       op, Rc_lhs is opcode=0x10 & ofunc=0x09 & rega=31 & op & Rc_lhs { Rc_lhs = sext(- op:4); }
 :SUBL   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x09 & Ra & op & Rc_lhs { tmp = Ra:4 - op:4; Rc_lhs = sext(tmp); }
 :SUBL^"/V"   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x49 & Ra & op & Rc_lhs { tmp = Ra:4 - op:4; Rc_lhs = sext(tmp); }
 :S4SUBL Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x0b & Ra & op & Rc_lhs { tmp = Ra:4 << 2; tmp = tmp - op:4; Rc_lhs = sext(tmp); }
 :S8SUBL Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x1b & Ra & op & Rc_lhs { tmp = Ra:4 << 3; tmp = tmp - op:4; Rc_lhs = sext(tmp); }
+:NEGQ       op, Rc_lhs is opcode=0x10 & ofunc=0x29 & rega=31 & op & Rc_lhs { Rc_lhs = - op; }
 :SUBQ   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x29 & Ra & op & Rc_lhs { Rc_lhs = Ra - op; }
 :SUBQ^"/V"   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x69 & Ra & op & Rc_lhs { Rc_lhs = Ra - op; }
 :S4SUBQ Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x2b & Ra & op & Rc_lhs { tmp = Ra << 2; Rc_lhs = tmp - op; }
@@ -439,6 +461,7 @@ fcc: "GT" is ccode=7 & is_i = 0 & Fa { tmp:1 = (Fa f> 0); export tmp; }
 # logical functions
 :AND   Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x00 & Ra & op & Rc_lhs    { Rc_lhs = Ra & op; }
 :BIC   Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x08 & Ra & op & Rc_lhs    { Rc_lhs = Ra & ~op; }
+:NOP           is opcode=0x11 & ofunc=0x20 & rega=31 & regb=31 & regc=31 & is_lit=0 { }
 :CLR           Rc_lhs is opcode=0x11 & ofunc=0x20 & rega=31 & regb=31 & is_lit=0 & Rc_lhs { Rc_lhs = 0; }
 :MOV       op, Rc_lhs is opcode=0x11 & ofunc=0x20 & rega=31 & op & Rc_lhs { Rc_lhs = op; }
 :MOV       op, Rc_lhs is opcode=0x11 & ofunc=0x20 & rega=regb & op & Rc_lhs { Rc_lhs = op; }
@@ -458,56 +481,310 @@ macro cmov(condition,reg,val) {
 :CMOVEQ  Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x24 & Ra & op & Rc_lhs  { cmov(Ra == 0,Rc_lhs,op); }
 :CMOVGE  Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x46 & Ra & op & Rc_lhs  { cmov(Ra s>= 0,Rc_lhs,op); }
 :CMOVGT  Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x66 & Ra & op & Rc_lhs  { cmov(Ra s> 0,Rc_lhs,op); }
-:CMOVLBC Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x16 & Ra & op & Rc_lhs  { cmov((Ra:1 ^ 0x1),Rc_lhs,op); }
-:CMOVLBS Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x14 & Ra & op & Rc_lhs  { cmov((Ra:1 & 0x1),Rc_lhs,op); }
+:CMOVLBC Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x16 & Ra & op & Rc_lhs  { cmov((Ra & 1) == 0,Rc_lhs,op); }
+:CMOVLBS Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x14 & Ra & op & Rc_lhs  { cmov((Ra & 1) == 1,Rc_lhs,op); }
 :CMOVLE  Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x64 & Ra & op & Rc_lhs  { cmov(Ra s<= 0,Rc_lhs,op); }
 :CMOVLT  Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x44 & Ra & op & Rc_lhs  { cmov(Ra s< 0,Rc_lhs,op); }
 :CMOVNE  Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x26 & Ra & op & Rc_lhs  { cmov(Ra != 0,Rc_lhs,op); }
 
 # shift logical
-:SLL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x39 & Ra & op & Rc_lhs { Rc_lhs = Ra << op[0,5]; }
-:SRL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x34 & Ra & op & Rc_lhs { Rc_lhs = Ra >> op[0,5]; }
+:SLL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x39 & Ra & op & Rc_lhs { Rc_lhs = Ra << op[0,6]; }
+:SRL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x34 & Ra & op & Rc_lhs { Rc_lhs = Ra >> op[0,6]; }
 
 # shift arithmetic
-:SRA Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x3c & Ra & op & Rc_lhs { Rc_lhs = Ra s>> op[0,5]; }
+:SRA Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x3c & Ra & op & Rc_lhs { Rc_lhs = Ra s>> op[0,6]; }
 
 #=========================================================================
 # Byte Manipulation Instructions
 #=========================================================================
 
-# compare byte
-:CMPBGE Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x0f & Ra & op & Rc_lhs unimpl
+# compare byte: per-byte unsigned >=, one result bit per byte in Rc<7:0>
+:CMPBGE Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x0f & Ra & op & Rc_lhs {
+  local r:1 = 0;
+  local c:1 = Ra[0,8]  >= op[0,8];  r = r | (c << 0);
+  c = Ra[8,8]   >= op[8,8];  r = r | (c << 1);
+  c = Ra[16,8]  >= op[16,8]; r = r | (c << 2);
+  c = Ra[24,8]  >= op[24,8]; r = r | (c << 3);
+  c = Ra[32,8]  >= op[32,8]; r = r | (c << 4);
+  c = Ra[40,8]  >= op[40,8]; r = r | (c << 5);
+  c = Ra[48,8]  >= op[48,8]; r = r | (c << 6);
+  c = Ra[56,8]  >= op[56,8]; r = r | (c << 7);
+  Rc_lhs = zext(r);
+}
 
-# extract byte
-:EXTBL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x06 & Ra & op & Rc_lhs unimpl
-:EXTWL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x16 & Ra & op & Rc_lhs unimpl
-:EXTLL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x26 & Ra & op & Rc_lhs unimpl
-:EXTQL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x36 & Ra & op & Rc_lhs unimpl
-:EXTWH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x5a & Ra & op & Rc_lhs unimpl
-:EXTLH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x6a & Ra & op & Rc_lhs unimpl
-:EXTQH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x7a & Ra & op & Rc_lhs unimpl
+# extract byte. Byte position = op<2:0>, shift = pos*8 bits. The 128-bit temp
+# in ext_h makes the high half fall out and avoids shift-by-64 when pos==0.
+macro ext_l(rav, pos, rc, mask) { local sh:8 = (pos & 7) << 3; rc = (rav >> sh) & mask; }
+macro ext_h(rav, pos, rc, mask) { local sh:8 = (pos & 7) << 3; local n:8 = 64 - sh; local t:16 = zext(rav) << n; rc = t:8 & mask; }
+:EXTBL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x06 & Ra & op & Rc_lhs { ext_l(Ra, op, Rc_lhs, 0xff:8); }
+:EXTWL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x16 & Ra & op & Rc_lhs { ext_l(Ra, op, Rc_lhs, 0xffff:8); }
+:EXTLL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x26 & Ra & op & Rc_lhs { ext_l(Ra, op, Rc_lhs, 0xffffffff:8); }
+:EXTQL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x36 & Ra & op & Rc_lhs { ext_l(Ra, op, Rc_lhs, 0xffffffffffffffff:8); }
+:EXTWH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x5a & Ra & op & Rc_lhs { ext_h(Ra, op, Rc_lhs, 0xffff:8); }
+:EXTLH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x6a & Ra & op & Rc_lhs { ext_h(Ra, op, Rc_lhs, 0xffffffff:8); }
+:EXTQH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x7a & Ra & op & Rc_lhs { ext_h(Ra, op, Rc_lhs, 0xffffffffffffffff:8); }
 
-# byte insert
-:INSBL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x0b & Ra & op & Rc_lhs unimpl
-:INSWL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x1b & Ra & op & Rc_lhs unimpl
-:INSLL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x2b & Ra & op & Rc_lhs unimpl
-:INSQL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x3b & Ra & op & Rc_lhs unimpl
-:INSWH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x57 & Ra & op & Rc_lhs unimpl
-:INSLH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x67 & Ra & op & Rc_lhs unimpl
-:INSQH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x77 & Ra & op & Rc_lhs unimpl
+# byte insert. ins_l keeps the low 8 bytes of the shifted field, ins_h the high.
+macro ins_l(rav, pos, rc, mask) { local sh:8 = (pos & 7) << 3; local t:16 = zext(rav & mask) << sh; rc = t:8; }
+macro ins_h(rav, pos, rc, mask) { local sh:8 = (pos & 7) << 3; local t:16 = zext(rav & mask) << sh; t = t >> 64; rc = t:8; }
+:INSBL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x0b & Ra & op & Rc_lhs { ins_l(Ra, op, Rc_lhs, 0xff:8); }
+:INSWL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x1b & Ra & op & Rc_lhs { ins_l(Ra, op, Rc_lhs, 0xffff:8); }
+:INSLL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x2b & Ra & op & Rc_lhs { ins_l(Ra, op, Rc_lhs, 0xffffffff:8); }
+:INSQL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x3b & Ra & op & Rc_lhs { ins_l(Ra, op, Rc_lhs, 0xffffffffffffffff:8); }
+:INSWH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x57 & Ra & op & Rc_lhs { ins_h(Ra, op, Rc_lhs, 0xffff:8); }
+:INSLH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x67 & Ra & op & Rc_lhs { ins_h(Ra, op, Rc_lhs, 0xffffffff:8); }
+:INSQH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x77 & Ra & op & Rc_lhs { ins_h(Ra, op, Rc_lhs, 0xffffffffffffffff:8); }
 
-# byte mask
-:MSKBL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x02 & Ra & op & Rc_lhs unimpl
-:MSKWL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x12 & Ra & op & Rc_lhs unimpl
-:MSKLL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x22 & Ra & op & Rc_lhs unimpl
-:MSKQL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x32 & Ra & op & Rc_lhs unimpl
-:MSKWH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x52 & Ra & op & Rc_lhs unimpl
-:MSKLH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x62 & Ra & op & Rc_lhs unimpl
-:MSKQH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x72 & Ra & op & Rc_lhs unimpl
+# byte mask. msk_l clears the field within the low quadword, msk_h the high.
+macro msk_l(rav, pos, rc, mask) { local sh:8 = (pos & 7) << 3; local m:16 = zext(mask) << sh; rc = rav & ~(m:8); }
+macro msk_h(rav, pos, rc, mask) { local sh:8 = (pos & 7) << 3; local m:16 = zext(mask) << sh; m = m >> 64; rc = rav & ~(m:8); }
+:MSKBL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x02 & Ra & op & Rc_lhs { msk_l(Ra, op, Rc_lhs, 0xff:8); }
+:MSKWL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x12 & Ra & op & Rc_lhs { msk_l(Ra, op, Rc_lhs, 0xffff:8); }
+:MSKLL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x22 & Ra & op & Rc_lhs { msk_l(Ra, op, Rc_lhs, 0xffffffff:8); }
+:MSKQL Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x32 & Ra & op & Rc_lhs { msk_l(Ra, op, Rc_lhs, 0xffffffffffffffff:8); }
+:MSKWH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x52 & Ra & op & Rc_lhs { msk_h(Ra, op, Rc_lhs, 0xffff:8); }
+:MSKLH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x62 & Ra & op & Rc_lhs { msk_h(Ra, op, Rc_lhs, 0xffffffff:8); }
+:MSKQH Ra, op, Rc_lhs is opcode=0x12 & ofunc=0x72 & Ra & op & Rc_lhs { msk_h(Ra, op, Rc_lhs, 0xffffffffffffffff:8); }
 
 # sign extend
 :SEXTB op, Rc_lhs is opcode=0x1c & ofunc=0x00 & rega=31 & op & Rc_lhs { Rc_lhs = sext(op:1); }
 :SEXTW op, Rc_lhs is opcode=0x1c & ofunc=0x01 & rega=31 & op & Rc_lhs { Rc_lhs = sext(op:2); }
+
+#=========================================================================
+# Multimedia (MVI) and FIX extensions (opcode 0x1c)
+#=========================================================================
+
+# SIMD byte/word ops: per-element semantics are not expanded, so model them as
+# pcodeops that take the two source quadwords and produce the packed result.
+define pcodeop pixel_error;          # PERR  (sum of |byte differences|)
+define pcodeop min_signed_bytes;
+define pcodeop min_signed_words;
+define pcodeop min_unsigned_bytes;
+define pcodeop min_unsigned_words;
+define pcodeop max_signed_bytes;
+define pcodeop max_signed_words;
+define pcodeop max_unsigned_bytes;
+define pcodeop max_unsigned_words;
+define pcodeop float_to_int_s;       # FTOIS register bit repack
+
+:PERR   Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x31 & Ra & op & Rc_lhs { Rc_lhs = pixel_error(Ra, op); }
+:MINSB8 Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x38 & Ra & op & Rc_lhs { Rc_lhs = min_signed_bytes(Ra, op); }
+:MINSW4 Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x39 & Ra & op & Rc_lhs { Rc_lhs = min_signed_words(Ra, op); }
+:MINUB8 Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x3a & Ra & op & Rc_lhs { Rc_lhs = min_unsigned_bytes(Ra, op); }
+:MINUW4 Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x3b & Ra & op & Rc_lhs { Rc_lhs = min_unsigned_words(Ra, op); }
+:MAXUB8 Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x3c & Ra & op & Rc_lhs { Rc_lhs = max_unsigned_bytes(Ra, op); }
+:MAXUW4 Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x3d & Ra & op & Rc_lhs { Rc_lhs = max_unsigned_words(Ra, op); }
+:MAXSB8 Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x3e & Ra & op & Rc_lhs { Rc_lhs = max_signed_bytes(Ra, op); }
+:MAXSW4 Ra, op, Rc_lhs is opcode=0x1c & ofunc=0x3f & Ra & op & Rc_lhs { Rc_lhs = max_signed_words(Ra, op); }
+
+# unpack low bytes to words / longwords; pack low byte of each word / longword
+:UNPKBW Rb, Rc_lhs is opcode=0x1c & ofunc=0x34 & rega=31 & Rb & Rc_lhs {
+  local r:8 = 0;
+  r[0,8] = Rb[0,8]; r[16,8] = Rb[8,8]; r[32,8] = Rb[16,8]; r[48,8] = Rb[24,8];
+  Rc_lhs = r;
+}
+:UNPKBL Rb, Rc_lhs is opcode=0x1c & ofunc=0x35 & rega=31 & Rb & Rc_lhs {
+  local r:8 = 0;
+  r[0,8] = Rb[0,8]; r[32,8] = Rb[8,8];
+  Rc_lhs = r;
+}
+:PKWB Rb, Rc_lhs is opcode=0x1c & ofunc=0x36 & rega=31 & Rb & Rc_lhs {
+  local r:8 = 0;
+  r[0,8] = Rb[0,8]; r[8,8] = Rb[16,8]; r[16,8] = Rb[32,8]; r[24,8] = Rb[48,8];
+  Rc_lhs = r;
+}
+:PKLB Rb, Rc_lhs is opcode=0x1c & ofunc=0x37 & rega=31 & Rb & Rc_lhs {
+  local r:8 = 0;
+  r[0,8] = Rb[0,8]; r[8,8] = Rb[32,8];
+  Rc_lhs = r;
+}
+
+# FIX: move S/T float register to integer register
+:FTOIT Fa, Rc_lhs is opcode=0x1c & ofunc=0x70 & Fa & regb=31 & Rc_lhs { Rc_lhs = Fa; }
+:FTOIS Fa, Rc_lhs is opcode=0x1c & ofunc=0x78 & Fa & regb=31 & Rc_lhs { Rc_lhs = float_to_int_s(Fa); }
+
+#=========================================================================
+# Independent Floating-Point Instructions (opcode 0x17)
+#=========================================================================
+
+define pcodeop cvt_longword_to_quad;   # CVTLQ
+define pcodeop cvt_quad_to_longword;   # CVTQL
+define pcodeop set_fpcr;
+define pcodeop get_fpcr;
+
+# copy sign / copy sign-and-exponent
+:FNOP  is opcode=0x17 & fpfunc=0x020 & fa=31 & fb=31 & fc=31 { }
+:FCLR  Fc is opcode=0x17 & fpfunc=0x020 & fa=31 & fb=31 & Fc { Fc = 0; }
+:FABS  Fb, Fc is opcode=0x17 & fpfunc=0x020 & fa=31 & Fb & Fc { Fc = Fb & 0x7fffffffffffffff; }
+:CPYS  Fa, Fb, Fc is opcode=0x17 & fpfunc=0x020 & Fa & Fb & Fc { Fc = (Fa & 0x8000000000000000) | (Fb & 0x7fffffffffffffff); }
+:CPYSN Fa, Fb, Fc is opcode=0x17 & fpfunc=0x021 & Fa & Fb & Fc { Fc = ((Fa & 0x8000000000000000) ^ 0x8000000000000000) | (Fb & 0x7fffffffffffffff); }
+:CPYSE Fa, Fb, Fc is opcode=0x17 & fpfunc=0x022 & Fa & Fb & Fc { Fc = (Fa & 0xfff0000000000000) | (Fb & 0x000fffffffffffff); }
+
+# longword <-> quadword conversions in float registers
+:CVTLQ      Fb, Fc is opcode=0x17 & fpfunc=0x010 & fa=31 & Fb & Fc { Fc = cvt_longword_to_quad(Fb); }
+:CVTQL      Fb, Fc is opcode=0x17 & fpfunc=0x030 & fa=31 & Fb & Fc { Fc = cvt_quad_to_longword(Fb); }
+:CVTQL^"/V" Fb, Fc is opcode=0x17 & fpfunc=0x130 & fa=31 & Fb & Fc { Fc = cvt_quad_to_longword(Fb); }
+:CVTQL^"/SV" Fb, Fc is opcode=0x17 & fpfunc=0x530 & fa=31 & Fb & Fc { Fc = cvt_quad_to_longword(Fb); }
+
+# FPCR moves (Fa == Fb == Fc by convention)
+:MT_FPCR Fa is opcode=0x17 & fpfunc=0x024 & Fa { set_fpcr(Fa); }
+:MF_FPCR Fa is opcode=0x17 & fpfunc=0x025 & Fa { Fa = get_fpcr(); }
+
+# floating conditional move: move Fb into Fc if Fa meets the test
+:FCMOVEQ Fa, Fb, Fc is opcode=0x17 & fpfunc=0x02a & Fa & Fb & Fc { cmov(Fa f== 0, Fc, Fb); }
+:FCMOVNE Fa, Fb, Fc is opcode=0x17 & fpfunc=0x02b & Fa & Fb & Fc { cmov(Fa f!= 0, Fc, Fb); }
+:FCMOVLT Fa, Fb, Fc is opcode=0x17 & fpfunc=0x02c & Fa & Fb & Fc { cmov(Fa f< 0, Fc, Fb); }
+:FCMOVGE Fa, Fb, Fc is opcode=0x17 & fpfunc=0x02d & Fa & Fb & Fc { cmov(Fa f>= 0, Fc, Fb); }
+:FCMOVLE Fa, Fb, Fc is opcode=0x17 & fpfunc=0x02e & Fa & Fb & Fc { cmov(Fa f<= 0, Fc, Fb); }
+:FCMOVGT Fa, Fb, Fc is opcode=0x17 & fpfunc=0x02f & Fa & Fb & Fc { cmov(Fa f> 0, Fc, Fb); }
+
+#=========================================================================
+# Integer/Floating moves and square root (opcode 0x14, ITFP)
+#=========================================================================
+
+define pcodeop int_to_float_s;    # ITOFS bit repack
+define pcodeop int_to_float_f;    # ITOFF bit repack
+define pcodeop float_sqrt;
+
+# integer register -> floating register
+:ITOFS Ra, Fc is opcode=0x14 & fpfunc=0x004 & Ra & fb=31 & Fc { Fc = int_to_float_s(Ra); }
+:ITOFF Ra, Fc is opcode=0x14 & fpfunc=0x014 & Ra & fb=31 & Fc { Fc = int_to_float_f(Ra); }
+:ITOFT Ra, Fc is opcode=0x14 & fpfunc=0x024 & Ra & fb=31 & Fc { Fc = Ra; }
+
+# square root (unqualified forms)
+:SQRTF Fb, Fc is opcode=0x14 & fpfunc=0x08a & fa=31 & Fb & Fc { Fc = float_sqrt(Fb); }
+:SQRTG Fb, Fc is opcode=0x14 & fpfunc=0x0aa & fa=31 & Fb & Fc { Fc = float_sqrt(Fb); }
+:SQRTS Fb, Fc is opcode=0x14 & fpfunc=0x08b & fa=31 & Fb & Fc { Fc = float_sqrt(Fb); }
+:SQRTT Fb, Fc is opcode=0x14 & fpfunc=0x0ab & fa=31 & Fb & Fc { Fc = float_sqrt(Fb); }
+
+#=========================================================================
+# IEEE (opcode 0x16) and VAX (opcode 0x15) floating-point arithmetic
+#
+# The 11-bit function code splits into an operation/precision part (fp_lo)
+# and a round/trap qualifier (fp_hi). The qualifier subtables decode every
+# documented suffix; the arithmetic is modeled with float p-code (S is
+# treated as a double here — adequate for analysis, not bit-exact rounding).
+#=========================================================================
+
+# IEEE round/trap qualifier suffixes (Table C-3)
+ieeequal: ""      is fp_hi=0x02 { }
+ieeequal: "/C"    is fp_hi=0x00 { }
+ieeequal: "/M"    is fp_hi=0x01 { }
+ieeequal: "/D"    is fp_hi=0x03 { }
+ieeequal: "/U"    is fp_hi=0x06 { }
+ieeequal: "/UC"   is fp_hi=0x04 { }
+ieeequal: "/UM"   is fp_hi=0x05 { }
+ieeequal: "/UD"   is fp_hi=0x07 { }
+ieeequal: "/SU"   is fp_hi=0x16 { }
+ieeequal: "/SUC"  is fp_hi=0x14 { }
+ieeequal: "/SUM"  is fp_hi=0x15 { }
+ieeequal: "/SUD"  is fp_hi=0x17 { }
+ieeequal: "/SUI"  is fp_hi=0x1e { }
+ieeequal: "/SUIC" is fp_hi=0x1c { }
+ieeequal: "/SUIM" is fp_hi=0x1d { }
+ieeequal: "/SUID" is fp_hi=0x1f { }
+
+# VAX round/trap qualifier suffixes (Table C-4)
+vaxqual: ""     is fp_hi=0x02 { }
+vaxqual: "/C"   is fp_hi=0x00 { }
+vaxqual: "/U"   is fp_hi=0x06 { }
+vaxqual: "/UC"  is fp_hi=0x04 { }
+vaxqual: "/S"   is fp_hi=0x12 { }
+vaxqual: "/SC"  is fp_hi=0x10 { }
+vaxqual: "/SU"  is fp_hi=0x16 { }
+vaxqual: "/SUC" is fp_hi=0x14 { }
+
+# IEEE convert-to-integer qualifiers (V/SV family; same slots as ieeequal but
+# printed with V instead of U). Used by CVTTQ.
+cvtqual: ""      is fp_hi=0x02 { }
+cvtqual: "/C"    is fp_hi=0x00 { }
+cvtqual: "/M"    is fp_hi=0x01 { }
+cvtqual: "/D"    is fp_hi=0x03 { }
+cvtqual: "/V"    is fp_hi=0x06 { }
+cvtqual: "/VC"   is fp_hi=0x04 { }
+cvtqual: "/VM"   is fp_hi=0x05 { }
+cvtqual: "/VD"   is fp_hi=0x07 { }
+cvtqual: "/SV"   is fp_hi=0x16 { }
+cvtqual: "/SVC"  is fp_hi=0x14 { }
+cvtqual: "/SVM"  is fp_hi=0x15 { }
+cvtqual: "/SVD"  is fp_hi=0x17 { }
+cvtqual: "/SVI"  is fp_hi=0x1e { }
+cvtqual: "/SVIC" is fp_hi=0x1c { }
+cvtqual: "/SVIM" is fp_hi=0x1d { }
+cvtqual: "/SVID" is fp_hi=0x1f { }
+
+# VAX CVTGQ qualifiers (Table C-4)
+cvtgqual: ""     is fp_hi=0x02 { }
+cvtgqual: "/C"   is fp_hi=0x00 { }
+cvtgqual: "/V"   is fp_hi=0x06 { }
+cvtgqual: "/VC"  is fp_hi=0x04 { }
+cvtgqual: "/S"   is fp_hi=0x12 { }
+cvtgqual: "/SC"  is fp_hi=0x10 { }
+cvtgqual: "/SV"  is fp_hi=0x16 { }
+cvtgqual: "/SVC" is fp_hi=0x14 { }
+
+# CVTST qualifiers (none, /S)
+cvstqual: ""   is fp_hi=0x0a { }
+cvstqual: "/S" is fp_hi=0x1a { }
+
+:ADDS^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x00 & ieeequal & Fa & Fb & Fc { Fc = Fa f+ Fb; }
+:NEGS Fb, Fc is opcode=0x16 & fpfunc=0x081 & fa=31 & Fb & Fc { Fc = Fb ^ 0x8000000000000000; }
+:SUBS^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x01 & ieeequal & Fa & Fb & Fc { Fc = Fa f- Fb; }
+:MULS^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x02 & ieeequal & Fa & Fb & Fc { Fc = Fa f* Fb; }
+:DIVS^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x03 & ieeequal & Fa & Fb & Fc { Fc = Fa f/ Fb; }
+:ADDT^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x20 & ieeequal & Fa & Fb & Fc { Fc = Fa f+ Fb; }
+:NEGT Fb, Fc is opcode=0x16 & fpfunc=0x0a1 & fa=31 & Fb & Fc { Fc = Fb ^ 0x8000000000000000; }
+:SUBT^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x21 & ieeequal & Fa & Fb & Fc { Fc = Fa f- Fb; }
+:MULT^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x22 & ieeequal & Fa & Fb & Fc { Fc = Fa f* Fb; }
+:DIVT^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x23 & ieeequal & Fa & Fb & Fc { Fc = Fa f/ Fb; }
+
+:CMPTUN^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x24 & ieeequal & Fa & Fb & Fc { Fc = zext(Fa f!= Fb); }
+:CMPTEQ^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x25 & ieeequal & Fa & Fb & Fc { Fc = zext(Fa f== Fb); }
+:CMPTLT^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x26 & ieeequal & Fa & Fb & Fc { Fc = zext(Fa f< Fb); }
+:CMPTLE^ieeequal Fa, Fb, Fc is opcode=0x16 & fp_lo=0x27 & ieeequal & Fa & Fb & Fc { Fc = zext(Fa f<= Fb); }
+
+# IEEE conversions (qualified). Convert-to-integer (CVTTQ) uses the V/SV
+# qualifier family; CVTST uses none//S. fp_lo distinguishes the operation.
+define pcodeop cvt_t_to_s;
+define pcodeop cvt_t_to_q;
+define pcodeop cvt_q_to_s;
+define pcodeop cvt_q_to_t;
+define pcodeop cvt_s_to_t;
+:CVTTS^ieeequal Fb, Fc is opcode=0x16 & fp_lo=0x2c & ieeequal & fa=31 & Fb & Fc { Fc = cvt_t_to_s(Fb); }
+:CVTTQ^cvtqual  Fb, Fc is opcode=0x16 & fp_lo=0x2f & cvtqual  & fa=31 & Fb & Fc { Fc = cvt_t_to_q(Fb); }
+:CVTQS^ieeequal Fb, Fc is opcode=0x16 & fp_lo=0x3c & ieeequal & fa=31 & Fb & Fc { Fc = cvt_q_to_s(Fb); }
+:CVTQT^ieeequal Fb, Fc is opcode=0x16 & fp_lo=0x3e & ieeequal & fa=31 & Fb & Fc { Fc = cvt_q_to_t(Fb); }
+:CVTST^cvstqual Fb, Fc is opcode=0x16 & fp_lo=0x2c & cvstqual & fa=31 & Fb & Fc { Fc = cvt_s_to_t(Fb); }
+
+:ADDF^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x00 & vaxqual & Fa & Fb & Fc { Fc = Fa f+ Fb; }
+:NEGF Fb, Fc is opcode=0x15 & fpfunc=0x081 & fa=31 & Fb & Fc { Fc = Fb ^ 0x8000000000000000; }
+:SUBF^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x01 & vaxqual & Fa & Fb & Fc { Fc = Fa f- Fb; }
+:MULF^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x02 & vaxqual & Fa & Fb & Fc { Fc = Fa f* Fb; }
+:DIVF^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x03 & vaxqual & Fa & Fb & Fc { Fc = Fa f/ Fb; }
+:ADDG^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x20 & vaxqual & Fa & Fb & Fc { Fc = Fa f+ Fb; }
+:NEGG Fb, Fc is opcode=0x15 & fpfunc=0x0a1 & fa=31 & Fb & Fc { Fc = Fb ^ 0x8000000000000000; }
+:SUBG^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x21 & vaxqual & Fa & Fb & Fc { Fc = Fa f- Fb; }
+:MULG^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x22 & vaxqual & Fa & Fb & Fc { Fc = Fa f* Fb; }
+:DIVG^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x23 & vaxqual & Fa & Fb & Fc { Fc = Fa f/ Fb; }
+
+:CMPGEQ^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x25 & vaxqual & Fa & Fb & Fc { Fc = zext(Fa f== Fb); }
+:CMPGLT^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x26 & vaxqual & Fa & Fb & Fc { Fc = zext(Fa f< Fb); }
+:CMPGLE^vaxqual Fa, Fb, Fc is opcode=0x15 & fp_lo=0x27 & vaxqual & Fa & Fb & Fc { Fc = zext(Fa f<= Fb); }
+
+# VAX conversions (qualified). CVTGQ (to integer) uses its own /V family;
+# the others use the VAX U/SU family. CVTQF/CVTQG only define none and /C.
+define pcodeop cvt_d_to_g;
+define pcodeop cvt_g_to_d;
+define pcodeop cvt_g_to_f;
+define pcodeop cvt_g_to_q;
+define pcodeop cvt_q_to_f;
+define pcodeop cvt_q_to_g;
+:CVTDG^vaxqual  Fb, Fc is opcode=0x15 & fp_lo=0x1e & vaxqual  & fa=31 & Fb & Fc { Fc = cvt_d_to_g(Fb); }
+:CVTGD^vaxqual  Fb, Fc is opcode=0x15 & fp_lo=0x2d & vaxqual  & fa=31 & Fb & Fc { Fc = cvt_g_to_d(Fb); }
+:CVTGF^vaxqual  Fb, Fc is opcode=0x15 & fp_lo=0x2c & vaxqual  & fa=31 & Fb & Fc { Fc = cvt_g_to_f(Fb); }
+:CVTGQ^cvtgqual Fb, Fc is opcode=0x15 & fp_lo=0x2f & cvtgqual & fa=31 & Fb & Fc { Fc = cvt_g_to_q(Fb); }
+:CVTQF^vaxqual  Fb, Fc is opcode=0x15 & fp_lo=0x3c & vaxqual  & fa=31 & Fb & Fc { Fc = cvt_q_to_f(Fb); }
+:CVTQG^vaxqual  Fb, Fc is opcode=0x15 & fp_lo=0x3e & vaxqual  & fa=31 & Fb & Fc { Fc = cvt_q_to_g(Fb); }
 
 # set complete bytes to zero
 macro zap(src, dest, bits) {
@@ -547,10 +824,10 @@ macro zap(src, dest, bits) {
 #=========================================================================
 
 # Memory Format Floating-Point Instructions
-:LDF Fa, disp_regb is opcode=0x20 & Fa & disp_regb { Fa = disp_regb; }
-:LDG Fa, disp_regb is opcode=0x21 & Fa & disp_regb { Fa = disp_regb; }
-:LDS Fa, disp_regb is opcode=0x22 & Fa & disp_regb { Fa = disp_regb; }
-:LDT Fa, disp_regb is opcode=0x23 & Fa & disp_regb { Fa = disp_regb; }
+:LDF Fa, disp_regb is opcode=0x20 & Fa & disp_regb { Fa = zext(*:4 disp_regb); }
+:LDG Fa, disp_regb is opcode=0x21 & Fa & disp_regb { Fa = *:8 disp_regb; }
+:LDS Fa, disp_regb is opcode=0x22 & Fa & disp_regb { Fa = zext(*:4 disp_regb); }
+:LDT Fa, disp_regb is opcode=0x23 & Fa & disp_regb { Fa = *:8 disp_regb; }
 
 :STF Fa, disp_regb is opcode=0x24 & Fa & disp_regb { *:4 disp_regb = Fa:4; }
 :STG Fa, disp_regb is opcode=0x25 & Fa & disp_regb { *:8 disp_regb = Fa; }
@@ -565,6 +842,8 @@ macro zap(src, dest, bits) {
 #=========================================================================
 
 define pcodeop nop;
+define pcodeop hw_mfpr;
+define pcodeop hw_mtpr;
 
 :AMASK op, Rc_lhs is opcode=0x11 & ofunc=0x61 & op & Rc_lhs { Rc_lhs = op; }
 
@@ -581,7 +860,16 @@ define pcodeop nop;
 :CALL_PAL pcode is opcode=0x00 & pcode      { reg:8 = 0x358; ptr:8 = inst_next; *[register]reg = ptr; }
 @endif
 @if defined(21264)
-:CALL_PAL pcode is opcode=0x00 & pcode      { nop(); }
+define pcodeop call_pal;
+:CALL_PAL pcode is opcode=0x00 & pcode      { call_pal(pcode:4); }
+@endif
+@if defined(21364)
+define pcodeop call_pal;
+:CALL_PAL pcode is opcode=0x00 & pcode      { call_pal(pcode:4); }
+@endif
+@if defined(21464)
+define pcodeop call_pal;
+:CALL_PAL pcode is opcode=0x00 & pcode      { call_pal(pcode:4); }
 @endif
 
 # 21064: see EC-Q9ZUC-TE pg 95ff
@@ -605,14 +893,39 @@ define pcodeop nop;
 :HW_LD^hwmode rega,hwaddr is opcode=0x1b & hwmode & rega & hwaddr { rega = hwaddr; }
 :HW_ST^hwmode rega,hwaddr is opcode=0x1f & hwmode & rega & hwaddr { hwaddr = rega; }
 # offset 0x320 ==  EXC_ADDR
-:HW_REI             is opcode=0x1e & rega=31 & regb=31 & bit15=1 & bit14=0 { reg:8 = 0x320; ptr:8 = *[register]reg; goto [ptr]; }
+:HW_REI             is opcode=0x1e & rega=31 & regb=31 & bit15=1 & bit14=0 { reg:8 = 0x320; ptr:8 = *[register]reg; return [ptr]; }
 @else # not 21064
-:HW_MTPR Ra         is opcode=0x1d & Ra { nop(); }
-:HW_MFPR pcode      is opcode=0x19 & pcode { nop(); }
-:HW_REI             is opcode=0x1e & bit15=1 & bit14=0 { nop(); }
-# 21164 :HW_REI pcode      is opcode=0x1e & pcode { reg:8 = 0x358; ptr:8 = *[register]reg; goto [ptr]; }
-:HW_LD rega,paldisp is opcode=0x1b & rega & paldisp { nop(); }
-:HW_ST pcode        is opcode=0x1f & pcode { nop(); }
+@if defined(21164)
+# EV5 HW_MFPR/HW_MTPR: IPR selected by 16-bit index; model as pcodeops so
+# dataflow (e.g. r22 = hw_mfpr(<ipr>)) is visible in the decompiler.
+:HW_MFPR rega, ipr is opcode=0x19 & rega & ipr { rega = hw_mfpr(ipr:2); }
+:HW_MTPR rega, ipr is opcode=0x1d & rega & ipr { hw_mtpr(ipr:2, rega); }
+# offset 0x358 == EXC_ADDR; TYP[15:14]: 10=normal, 11=stall
+:HW_REI          is opcode=0x1e & bit15=1 & bit14=0 { reg:8 = 0x358; ptr:8 = *[register]reg; return [ptr]; }
+:HW_REI^"/stall" is opcode=0x1e & bit15=1 & bit14=1 { reg:8 = 0x358; ptr:8 = *[register]reg; return [ptr]; }
+@else # EV6+
+# EV6+ HW_MFPR/HW_MTPR: IPR selected by 8-bit index (bits 15:8); bits 7:0 are
+# scoreboard mask. Model as pcodeops so dataflow is visible in the decompiler.
+:HW_MFPR rega, ipr_ev6   is opcode=0x19 & rega & ipr_ev6 { rega = hw_mfpr(ipr_ev6:1); }
+:HW_MTPR Rb,   ipr_ev6   is opcode=0x1d & Rb   & ipr_ev6 { hw_mtpr(ipr_ev6:1, Rb); }
+# EV6+ opcode 0x1e is HW_RET (not HW_REI): target PC comes from RB, not EXC_ADDR.
+# HINT[15:14]: 00=JMP, 01=JSR, 10=RET, 11=COROUTINE; bit[13]=STALL (pipeline only).
+:HW_JMP       (Rb) is opcode=0x1e & Rb & bit15=0 & bit14=0 { goto [Rb]; }
+:HW_JSR       (Rb) is opcode=0x1e & Rb & bit15=0 & bit14=1 { call [Rb]; }
+:HW_RET       (Rb) is opcode=0x1e & Rb & bit15=1 & bit14=0 { return [Rb]; }
+:HW_COROUTINE (Rb) is opcode=0x1e & Rb & bit15=1 & bit14=1 { call [Rb]; }
+@endif
+@if defined(21164)
+# EV5 HW_LD/HW_ST: Rb + signed 10-bit displacement; mode flags in bits 15:10
+hwaddr_ev5: hwsdisp_ev5(Rb) is hwsdisp_ev5 & Rb { d:2 = hwsdisp_ev5; ptr = Rb + sext(d); export *[ram]:8 ptr; }
+:HW_LD rega, hwaddr_ev5 is opcode=0x1b & rega & hwaddr_ev5 { rega = hwaddr_ev5; }
+:HW_ST rega, hwaddr_ev5 is opcode=0x1f & rega & hwaddr_ev5 { hwaddr_ev5 = rega; }
+@else
+# EV6+ HW_LD/HW_ST: Rb + signed 12-bit displacement; mode in bits 15:12
+hwaddr_ev: hwsdisp(Rb) is hwsdisp & Rb { d:2 = hwsdisp; ptr = Rb + sext(d); export *[ram]:8 ptr; }
+:HW_LD rega, hwaddr_ev is opcode=0x1b & rega & hwaddr_ev { rega = hwaddr_ev; }
+:HW_ST rega, hwaddr_ev is opcode=0x1f & rega & hwaddr_ev { hwaddr_ev = rega; }
+@endif
 @endif
 
 # cache hints
