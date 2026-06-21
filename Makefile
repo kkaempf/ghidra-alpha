@@ -28,9 +28,11 @@ data/languages/21364UNIX.sla: data/languages/21364UNIX.slaspec data/languages/al
 
 data/languages/21364NT.sla: data/languages/21364NT.slaspec data/languages/alpha.sinc
 
+SLEIGH ?= sleigh
+
 %.sla: %.slaspec
-	/abuild/projects/Ghidra/ghidra/Ghidra/Features/Decompiler/src/decompile/cpp/sleigh_dbg $<
-	sleigh -u $< $@
+	$(SLEIGH) $<
+	$(SLEIGH) -u $< $@
 
 test:
 	make -C tests
