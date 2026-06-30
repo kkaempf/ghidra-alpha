@@ -92,7 +92,7 @@ define register offset=0x500 size=1 [ _      l    v    lv    q    lq    vq    lv
 define register offset=0x600 size=8 [ PalTemp0  PalTemp1  PalTemp2  PalTemp3  PalTemp4  PalTemp5  PalTemp6  PalTemp7
                                       PalTemp8  PalTemp9  PalTemp10 PalTemp11 palTemp12 PalTemp13 PalTemp14 PalTemp15
 				      PalTemp16 PalTemp17 palTemp18 PalTemp19 PalTemp20 PalTemp21 PalTemp22 PalTemp23
-				      PalTemp24 PalTemp25 PalTemp26 PalTemp27 PalTemp28 PalTemp29 palTemp30 PalTemp31 ];
+				      PalTemp24 PalTemp25 PalTemp26 PalTemp27 PalTemp28 PalTemp29 PalTemp30 PalTemp31 ];
 
 @if defined(21164)
 # internal processor registers (IPRs)
@@ -228,7 +228,7 @@ attach variables [ fa fb fc ]   [ f0  f1  f2  f3  f4  f5  f6  f7  f8  f9  f10 f1
 attach variables [ tmpidx ] [ PalTemp0  PalTemp1  PalTemp2  PalTemp3  PalTemp4  PalTemp5  PalTemp6  PalTemp7
                               PalTemp8  PalTemp9  PalTemp10 PalTemp11 palTemp12 PalTemp13 PalTemp14 PalTemp15
                               PalTemp16 PalTemp17 palTemp18 PalTemp19 PalTemp20 PalTemp21 PalTemp22 PalTemp23
-                              PalTemp24 PalTemp25 PalTemp26 PalTemp27 PalTemp28 PalTemp29 palTemp30 PalTemp31 ];
+                              PalTemp24 PalTemp25 PalTemp26 PalTemp27 PalTemp28 PalTemp29 PalTemp30 PalTemp31 ];
 
 @if defined(21064)
 # 21064 Ibox registers
