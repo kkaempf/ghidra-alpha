@@ -87,6 +87,7 @@
         <register name="s3"/>
         <register name="s4"/>
         <register name="s5"/>
+        <register name="gp"/>
         <register name="sp"/>
         <register name="fp"/>
         <register name="f2"/>
@@ -113,7 +114,6 @@
         <register name="t11"/>
         <register name="t12"/>
         <register name="at"/>
-        <register name="gp"/>
         <register name="f10"/>
         <register name="f11"/>
         <register name="f12"/>
