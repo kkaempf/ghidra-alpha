@@ -97,6 +97,7 @@
       </output>
       <unaffected>
         <register name="SP"/>
+        <register name="FP"/>
         <register name="R2"/>
         <register name="R3"/>
         <register name="R4"/>
