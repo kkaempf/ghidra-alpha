@@ -26,3 +26,11 @@ sudo ln -s `pwd`/ghidra-alpha /usr/lib64/ghidra/Ghidra/Processors/Alpha
 
 Then start Ghidra. You now have three Alpha processors (21064, 21164,
 21264) to choose from.
+
+# Analyzer and loader
+
+`make analyzer` builds `lib/Alpha.jar`, which Ghidra picks up from the
+module. It adds a gp-relative reference analyzer and an "Alpha ECOFF
+(Tru64 UNIX)" loader for Tru64 (Digital UNIX, DEC OSF/1) executables
+and shared libraries. The loader reads symbols from the ECOFF symbol
+table, `.dynsym`, and `.pdata`.
