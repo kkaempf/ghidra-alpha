@@ -57,9 +57,10 @@ import ghidra.util.task.TaskMonitor;
  * fixed gp and may reach code without a recomputing prologue, an optional
  * override seeds gp directly with a user-supplied value.
  *
- * <p>This does not apply to OpenVMS Alpha, which has no global pointer: $29 is
+ * <p>Neither seed applies to OpenVMS Alpha, which has no global pointer: $29 is
  * the frame pointer and $27 holds the address of a procedure descriptor rather
- * than an entry point. The analyzer declines those language variants.
+ * than an entry point. The OpenVMS loader sets $27 in the program context
+ * itself, so there the analyzer only propagates constants.
  */
 public class AlphaAddressAnalyzer extends ConstantPropagationAnalyzer {
 
@@ -101,14 +102,8 @@ public class AlphaAddressAnalyzer extends ConstantPropagationAnalyzer {
 
 	@Override
 	public boolean canAnalyze(Program program) {
-		if (!program.getLanguage().getProcessor().equals(
-			Processor.findOrPossiblyCreateProcessor(PROCESSOR_NAME))) {
-			return false;
-		}
-		// OpenVMS Alpha has no global pointer: $27 holds the address of the
-		// procedure descriptor rather than the entry point, and $29 is FP.
-		// Neither seed is meaningful, and both can create bogus references.
-		return !program.getLanguage().getLanguageID().getIdAsString().endsWith(":vms");
+		return program.getLanguage().getProcessor().equals(
+			Processor.findOrPossiblyCreateProcessor(PROCESSOR_NAME));
 	}
 
 	@Override
@@ -116,7 +111,9 @@ public class AlphaAddressAnalyzer extends ConstantPropagationAnalyzer {
 			AddressSetView flowSet, SymbolicPropogator symEval, TaskMonitor monitor)
 			throws CancelledException {
 
-		seedRegisters(program, flowStart);
+		if (!program.getLanguage().getLanguageID().getIdAsString().endsWith(":vms")) {
+			seedRegisters(program, flowStart);
+		}
 
 		return super.flowConstants(program, flowStart, flowSet, symEval, monitor);
 	}
