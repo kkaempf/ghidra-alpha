@@ -16,21 +16,30 @@
 package ghidra.app.util.opinion;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.*;
 
 import ghidra.app.util.MemoryBlockUtils;
 import ghidra.app.util.bin.BinaryReader;
 import ghidra.app.util.bin.ByteProvider;
 import ghidra.app.util.importer.MessageLog;
+import ghidra.framework.Application;
 import ghidra.program.database.mem.FileBytes;
 import ghidra.program.model.address.Address;
+import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.address.AddressSpace;
+import ghidra.program.model.data.DataUtilities;
+import ghidra.program.model.data.DataUtilities.ClearDataMode;
+import ghidra.program.model.data.PointerDataType;
 import ghidra.program.model.lang.*;
+import ghidra.program.model.listing.Function;
+import ghidra.program.model.listing.Library;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
 import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.symbol.*;
 import ghidra.util.exception.CancelledException;
+import ghidra.util.exception.InvalidInputException;
 import ghidra.util.task.TaskMonitor;
 
 /**
@@ -38,7 +47,10 @@ import ghidra.util.task.TaskMonitor;
  * shared libraries.
  *
  * <p>Function starts come from the ECOFF symbol table when present, from
- * .dynsym, and from the code range descriptors in .pdata.
+ * .dynsym, and from the code range descriptors in .pdata. Each import gets
+ * an external function. Its GOT slot points at a thunk for it and carries an
+ * external reference, which is what lets the decompiler name calls through
+ * the GOT, and its lazy-binding stub in .text becomes a thunk too.
  */
 public class AlphaEcoffLoader extends AbstractProgramWrapperLoader {
 
@@ -94,9 +106,10 @@ public class AlphaEcoffLoader extends AbstractProgramWrapperLoader {
 		static final int SC_TEXT = 1, SC_UNDEFINED = 6, SC_INIT = 22, SC_FINI = 26;
 		static final Set<Integer> SC_ADDRESS = Set.of(1, 2, 3, 13, 14, 15, 22, 24, 25, 26, 27);
 
-		// .dynsym section indices and symbol types.
+		// .dynsym section indices and the MIPS-style .dynamic tags Tru64 uses.
 		static final int SHN_UNDEF = 0, SHN_TEXT = 0xff01;
 		static final int STT_FUNC = 2;
+		static final int DT_MIPS_LOCAL_GOTNO = 0x7000000a, DT_MIPS_GOTSYM = 0x70000013;
 
 		final Program program;
 		final BinaryReader r;
@@ -247,20 +260,214 @@ public class AlphaEcoffLoader extends AbstractProgramWrapperLoader {
 			}
 		}
 
-		/** .dynsym names. */
+		/** .dynsym names, and external thunks for the imports in the GOT. */
 		void loadDynamic() throws IOException {
+			Section dynamic = sections.get(".dynamic");
 			Section dynsym = sections.get(".dynsym");
 			Section dynstr = sections.get(".dynstr");
-			if (dynsym == null || dynstr == null) {
+			Section got = sections.get(".got");
+			if (dynamic == null || dynsym == null || dynstr == null) {
 				return;
 			}
-			for (long o = dynsym.scnptr(); o + 24 <= dynsym.scnptr() + dynsym.size(); o += 24) {
-				String name = r.readAsciiString(dynstr.scnptr() + r.readUnsignedInt(o));
-				int shndx = r.readUnsignedShort(o + 22);
-				if (!name.isEmpty() && !name.startsWith(".") && shndx != SHN_UNDEF) {
-					label(r.readLong(o + 8), name,
-						shndx == SHN_TEXT && (r.readUnsignedByte(o + 20) & 0xf) == STT_FUNC);
+
+			// Each GOT has a pair of tags: the GOT index of its first global
+			// entry, and the first .dynsym index those entries cover.
+			List<Long> gotIndex = new ArrayList<>();
+			List<Long> gotSym = new ArrayList<>();
+			for (long o = dynamic.scnptr(); o < dynamic.scnptr() + dynamic.size(); o += 16) {
+				int tag = r.readInt(o);
+				long val = r.readUnsignedInt(o + 8);
+				if (tag == 0) {
+					break;
 				}
+				if (tag == DT_MIPS_LOCAL_GOTNO) {
+					gotIndex.add(val);
+				}
+				else if (tag == DT_MIPS_GOTSYM) {
+					gotSym.add(val);
+				}
+			}
+
+			ExternalManager ext = program.getExternalManager();
+
+			int nsyms = (int) (dynsym.size() / 24);
+			Map<Long, Address> stubs = findStubs();
+			Address thunks = null;
+			Map<Address, ExternalLocation> imports = new HashMap<>();
+			Set<String> noReturn = noReturnNames();
+			for (int j = 0; j < nsyms; j++) {
+				long o = dynsym.scnptr() + 24L * j;
+				String name = r.readAsciiString(dynstr.scnptr() + r.readUnsignedInt(o));
+				long value = r.readLong(o + 8);
+				int info = r.readUnsignedByte(o + 20);
+				int shndx = r.readUnsignedShort(o + 22);
+				if (name.isEmpty() || name.startsWith(".")) {
+					continue;
+				}
+				if (shndx != SHN_UNDEF) {
+					label(value, name, shndx == SHN_TEXT && (info & 0xf) == STT_FUNC);
+					continue;
+				}
+				// Imports below the first GOT symbol have no slot and are
+				// reached only through their stubs.
+				long slot = gotSlot(j, gotIndex, gotSym);
+				boolean inGot = got != null && slot >= 0 && slot < got.size() / 8;
+				Address stub = stubs.get((long) j);
+				if (!inGot && stub == null) {
+					continue;
+				}
+				ExternalLocation loc;
+				try {
+					loc = ext.addExtFunction(Library.UNKNOWN, name, null, SourceType.IMPORTED);
+				}
+				catch (Exception e) {
+					log.appendMsg("Cannot create import " + name + ": " + e.getMessage());
+					continue;
+				}
+				if (noReturn.contains(name.replaceFirst("^_+", ""))) {
+					loc.getFunction().setNoReturn(true);
+				}
+				if (stub != null) {
+					thunk(stub, 16, loc);
+				}
+				if (!inGot) {
+					continue;
+				}
+				if (thunks == null) {
+					thunks = createExternalBlock(nsyms);
+					if (thunks == null) {
+						return;
+					}
+				}
+				Address thunk = thunks.add(8L * j);
+				thunk(thunk, 1, loc);
+				Address slotAddr = addr(got.vaddr() + 8 * slot);
+				try {
+					memory.setLong(slotAddr, thunk.getOffset());
+					imports.put(slotAddr, loc);
+				}
+				catch (Exception e) {
+					log.appendMsg("Cannot patch GOT slot " + slotAddr + ": " + e.getMessage());
+				}
+			}
+
+			if (got != null) {
+				for (long a = got.vaddr(); a < got.vaddr() + got.size(); a += 8) {
+					try {
+						DataUtilities.createData(program, addr(a), PointerDataType.dataType, 8,
+							ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
+					}
+					catch (Exception e) {
+						// leave it undefined
+					}
+				}
+			}
+
+			// The decompiler names a call through a pointer only when the
+			// pointer's primary reference is external, as for a PE import table.
+			ReferenceManager refs = program.getReferenceManager();
+			for (Map.Entry<Address, ExternalLocation> e : imports.entrySet()) {
+				refs.removeAllReferencesFrom(e.getKey());
+				try {
+					refs.addExternalReference(e.getKey(), 0, e.getValue(), SourceType.IMPORTED,
+						RefType.DATA);
+				}
+				catch (InvalidInputException x) {
+					log.appendMsg("Cannot reference import at " + e.getKey() + ": " +
+						x.getMessage());
+				}
+			}
+		}
+
+		/**
+		 * The noreturn analyzer keys its name lists by executable format and
+		 * has none for ECOFF, so mark imports from the ELF list here.
+		 */
+		Set<String> noReturnNames() {
+			Set<String> names = new HashSet<>();
+			try (InputStream in = Application
+					.getModuleDataFile("Base", "ElfFunctionsThatDoNotReturn")
+					.getInputStream()) {
+				for (String line : new String(in.readAllBytes()).split("\n")) {
+					line = line.trim();
+					if (!line.isEmpty() && !line.startsWith("#")) {
+						names.add(line);
+					}
+				}
+			}
+			catch (IOException e) {
+				log.appendMsg("Cannot read the non-returning function names: " + e.getMessage());
+			}
+			return names;
+		}
+
+		/**
+		 * Lazy-binding stubs pass the .dynsym index of their import to the
+		 * resolver, which the first GOT entry holds:
+		 *
+		 *     ldq  t12, -32752(gp)
+		 *     lda  at, lo(zero)
+		 *     ldah at, hi(at)
+		 *     jmp  (t12)
+		 */
+		Map<Long, Address> findStubs() throws IOException {
+			Map<Long, Address> stubs = new HashMap<>();
+			Section text = sections.get(".text");
+			if (text == null || text.scnptr() == 0) {
+				return stubs;
+			}
+			for (long o = 0; o + 16 <= text.size(); o += 4) {
+				long p = text.scnptr() + o;
+				int lda = r.readInt(p + 4);
+				int ldah = r.readInt(p + 8);
+				if (r.readInt(p) == 0xa77d8010 && (lda & 0xffff0000) == 0x239f0000 &&
+					(ldah & 0xffff0000) == 0x279c0000 && r.readInt(p + 12) == 0x6b7b0000) {
+					stubs.put((long) (short) lda + ((long) (short) ldah << 16),
+						addr(text.vaddr() + o));
+				}
+			}
+			return stubs;
+		}
+
+		static long gotSlot(int sym, List<Long> gotIndex, List<Long> gotSym) {
+			for (int k = Math.min(gotIndex.size(), gotSym.size()) - 1; k >= 0; k--) {
+				if (sym >= gotSym.get(k)) {
+					return gotIndex.get(k) + sym - gotSym.get(k);
+				}
+			}
+			return -1;
+		}
+
+		Address createExternalBlock(int nsyms) {
+			long end = 0;
+			for (MemoryBlock b : memory.getBlocks()) {
+				end = Math.max(end, b.getEnd().getOffset() + 1);
+			}
+			Address start = addr((end + 0xfff) & ~0xfffL);
+			MemoryBlock b = MemoryBlockUtils.createUninitializedBlock(program, false,
+				MemoryBlock.EXTERNAL_BLOCK_NAME, start, 8L * nsyms,
+				"Thunks for imported functions", NAME, true, false, false, log);
+			if (b != null) {
+				b.setArtificial(true);
+			}
+			return b == null ? null : start;
+		}
+
+		void thunk(Address a, int len, ExternalLocation loc) {
+			if (!memory.contains(a)) {
+				return;
+			}
+			try {
+				Function f = program.getFunctionManager().getFunctionAt(a);
+				if (f == null) {
+					f = program.getFunctionManager()
+							.createFunction(loc.getLabel(), a,
+								new AddressSet(a, a.add(len - 1)), SourceType.IMPORTED);
+				}
+				f.setThunkedFunction(loc.getFunction());
+			}
+			catch (Exception e) {
+				log.appendMsg("Cannot create thunk at " + a + ": " + e.getMessage());
 			}
 		}
 

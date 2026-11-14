@@ -33,4 +33,5 @@ Then start Ghidra. You now have three Alpha processors (21064, 21164,
 module. It adds a gp-relative reference analyzer and an "Alpha ECOFF
 (Tru64 UNIX)" loader for Tru64 (Digital UNIX, DEC OSF/1) executables
 and shared libraries. The loader reads symbols from the ECOFF symbol
-table, `.dynsym`, and `.pdata`.
+table, `.dynsym`, and `.pdata`, and names calls to imports through the
+GOT.
