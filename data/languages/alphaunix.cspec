@@ -103,6 +103,8 @@
         <register name="s3"/>
         <register name="s4"/>
         <register name="s5"/>
+        <register name="GP"/>
+        <register name="RA"/>
         <register name="FP"/>
         <register name="f2"/>
         <register name="f3"/>
@@ -128,7 +130,6 @@
         <register name="t11"/>
         <register name="pv"/>
         <register name="at"/>
-        <register name="GP"/>
         <register name="f10"/>
         <register name="f11"/>
         <register name="f12"/>
