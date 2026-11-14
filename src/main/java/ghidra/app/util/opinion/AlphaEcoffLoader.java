@@ -17,6 +17,7 @@ package ghidra.app.util.opinion;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigInteger;
 import java.util.*;
 
 import ghidra.app.util.MemoryBlockUtils;
@@ -32,7 +33,9 @@ import ghidra.program.model.data.DataUtilities;
 import ghidra.program.model.data.DataUtilities.ClearDataMode;
 import ghidra.program.model.data.PointerDataType;
 import ghidra.program.model.lang.*;
+import ghidra.program.model.listing.ContextChangeException;
 import ghidra.program.model.listing.Function;
+import ghidra.program.model.listing.FunctionManager;
 import ghidra.program.model.listing.Library;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
@@ -51,6 +54,10 @@ import ghidra.util.task.TaskMonitor;
  * an external function. Its GOT slot points at a thunk for it and carries an
  * external reference, which is what lets the decompiler name calls through
  * the GOT, and its lazy-binding stub in .text becomes a thunk too.
+ *
+ * <p>GP is set in the program context where it is known on entry: past an
+ * ldgp prologue, where local callers branch in, and at static procedures
+ * without one, which run on their callers' GP.
  */
 public class AlphaEcoffLoader extends AbstractProgramWrapperLoader {
 
@@ -109,6 +116,7 @@ public class AlphaEcoffLoader extends AbstractProgramWrapperLoader {
 		// .dynsym section indices and the MIPS-style .dynamic tags Tru64 uses.
 		static final int SHN_UNDEF = 0, SHN_TEXT = 0xff01;
 		static final int STT_FUNC = 2;
+		static final int UNOP = 0x2ffe0000;
 		static final int DT_MIPS_LOCAL_GOTNO = 0x7000000a, DT_MIPS_GOTSYM = 0x70000013;
 
 		final Program program;
@@ -118,6 +126,7 @@ public class AlphaEcoffLoader extends AbstractProgramWrapperLoader {
 		final AddressSpace space;
 		final Memory memory;
 		final SymbolTable symbols;
+		final Register gpReg;
 		final Map<String, Section> sections = new LinkedHashMap<>();
 
 		Image(Program program, ByteProvider provider, MessageLog log, TaskMonitor monitor) {
@@ -128,6 +137,8 @@ public class AlphaEcoffLoader extends AbstractProgramWrapperLoader {
 			this.space = program.getAddressFactory().getDefaultAddressSpace();
 			this.memory = program.getMemory();
 			this.symbols = program.getSymbolTable();
+			this.gpReg = program.getLanguage()
+					.getRegister(program.getAddressFactory().getRegisterSpace(), 29 * 8, 8);
 		}
 
 		Address addr(long offset) {
@@ -481,6 +492,8 @@ public class AlphaEcoffLoader extends AbstractProgramWrapperLoader {
 			if (pdata == null || pdata.scnptr() == 0) {
 				return;
 			}
+			TreeMap<Address, Long> gps = new TreeMap<>();
+			Map<Address, Ldgp> prologues = new HashMap<>();
 			for (long i = 0; i < pdata.size() / 8; i++) {
 				int begin = r.readInt(pdata.scnptr() + 8 * i);
 				int rpd = r.readInt(pdata.scnptr() + 8 * i + 4);
@@ -492,9 +505,139 @@ public class AlphaEcoffLoader extends AbstractProgramWrapperLoader {
 				MemoryBlock block = memory.getBlock(a);
 				if (block != null && block.isExecute()) {
 					AbstractProgramLoader.markAsFunction(program, null, a);
+					Ldgp p = ldgp(a);
+					gps.put(a, p == null ? null : p.gp());
+					if (p != null) {
+						prologues.put(a, p);
+					}
+				}
+			}
+
+			Map<Address, List<Address>> branches = branches();
+			inheritGp(gps, branches);
+			for (Map.Entry<Address, Ldgp> e : prologues.entrySet()) {
+				localEntry(e.getKey(), e.getValue(), branches.keySet());
+			}
+		}
+
+		/** Sources of BR and BSR in .text, by target. */
+		Map<Address, List<Address>> branches() throws IOException {
+			Map<Address, List<Address>> branches = new HashMap<>();
+			Section text = sections.get(".text");
+			if (text == null || text.scnptr() == 0) {
+				return branches;
+			}
+			for (long o = 0; o + 4 <= text.size(); o += 4) {
+				int w = r.readInt(text.scnptr() + o);
+				int op = w >>> 26;
+				if (op == 0x30 || op == 0x34) {
+					Address to = addr(text.vaddr() + o + 4 + 4L * ((w << 11) >> 11));
+					branches.computeIfAbsent(to, k -> new ArrayList<>())
+							.add(addr(text.vaddr() + o));
+				}
+			}
+			return branches;
+		}
+
+		/** The GP an ldgp prologue sets up, and the address after it. */
+		record Ldgp(long gp, Address end) {
+		}
+
+		/**
+		 * The ldgp prologue at entry, or null if there is none:
+		 *
+		 *     ldah gp, hi(pv)
+		 *     lda  gp, lo(gp)
+		 *
+		 * possibly padded with unops.
+		 */
+		Ldgp ldgp(Address entry) {
+			try {
+				int w = memory.getInt(entry);
+				if ((w & 0xffff0000) != 0x27bb0000) {
+					return null;
+				}
+				long gp = entry.getOffset() + ((long) (short) w << 16);
+				Address a = entry.add(4);
+				while (memory.getInt(a) == UNOP) {
+					a = a.add(4);
+				}
+				w = memory.getInt(a);
+				return (w & 0xffff0000) == 0x23bd0000 ? new Ldgp(gp + (short) w, a.add(4)) : null;
+			}
+			catch (Exception e) {
+				return null;
+			}
+		}
+
+		void setGp(Address a, long gp) throws ContextChangeException {
+			program.getProgramContext().setValue(gpReg, a, a, BigInteger.valueOf(gp));
+		}
+
+		/**
+		 * Static procedures without a prologue run on their callers' GP. Give
+		 * one the GP of the procedures that branch to it when those with a
+		 * known GP agree, and repeat until nothing changes.
+		 */
+		void inheritGp(TreeMap<Address, Long> gps, Map<Address, List<Address>> branches) {
+			boolean changed = true;
+			while (changed) {
+				changed = false;
+				for (Map.Entry<Address, Long> e : gps.entrySet()) {
+					List<Address> from = branches.get(e.getKey());
+					if (e.getValue() != null || from == null) {
+						continue;
+					}
+					Set<Long> callers = new HashSet<>();
+					for (Address f : from) {
+						Map.Entry<Address, Long> caller = gps.floorEntry(f);
+						if (caller != null && caller.getValue() != null) {
+							callers.add(caller.getValue());
+						}
+					}
+					if (callers.size() != 1) {
+						continue;
+					}
+					long gp = callers.iterator().next();
+					try {
+						setGp(e.getKey(), gp);
+						e.setValue(gp);
+						changed = true;
+					}
+					catch (ContextChangeException x) {
+						log.appendMsg("Cannot set GP at " + e.getKey() + ": " + x.getMessage());
+					}
 				}
 			}
 		}
 
+		/**
+		 * Callers that share a procedure's GP branch past its ldgp prologue.
+		 * When something branches there, make that the function, with GP known
+		 * on entry, and the outer entry a thunk to it.
+		 */
+		void localEntry(Address entry, Ldgp p, Set<Address> targets) {
+			try {
+				Address local = p.end();
+				while (!targets.contains(local) && memory.getInt(local) == UNOP) {
+					local = local.add(4);
+				}
+				if (!targets.contains(local)) {
+					return;
+				}
+				setGp(local, p.gp());
+				Symbol sym = symbols.getPrimarySymbol(entry);
+				String name = sym == null || sym.getSource() == SourceType.DEFAULT ? null
+						: sym.getName();
+				AbstractProgramLoader.markAsFunction(program, name, local);
+				FunctionManager fm = program.getFunctionManager();
+				Function outer = fm.getFunctionAt(entry);
+				outer.setBody(new AddressSet(entry, local.subtract(1)));
+				outer.setThunkedFunction(fm.getFunctionAt(local));
+			}
+			catch (Exception e) {
+				log.appendMsg("Cannot split the GP prologue at " + entry + ": " + e.getMessage());
+			}
+		}
 	}
 }
