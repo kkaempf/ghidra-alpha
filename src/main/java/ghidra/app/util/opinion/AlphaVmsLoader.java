@@ -15,28 +15,29 @@
  */
 package ghidra.app.util.opinion;
 
+import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.file.AccessMode;
 import java.util.*;
 
 import ghidra.app.util.MemoryBlockUtils;
 import ghidra.app.util.Option;
-import ghidra.app.util.bin.BinaryReader;
-import ghidra.app.util.bin.ByteProvider;
+import ghidra.app.util.bin.*;
+import ghidra.app.util.importer.LibrarySearchPathManager;
 import ghidra.app.util.importer.MessageLog;
 import ghidra.framework.model.DomainObject;
 import ghidra.program.database.mem.FileBytes;
-import ghidra.program.model.address.Address;
-import ghidra.program.model.address.AddressSpace;
+import ghidra.program.model.address.*;
 import ghidra.program.model.data.*;
 import ghidra.program.model.data.DataUtilities.ClearDataMode;
 import ghidra.program.model.lang.*;
+import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
 import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.reloc.Relocation.Status;
-import ghidra.program.model.symbol.SourceType;
-import ghidra.program.model.symbol.SymbolTable;
+import ghidra.program.model.symbol.*;
 import ghidra.util.exception.CancelledException;
 import ghidra.util.task.TaskMonitor;
 
@@ -53,6 +54,13 @@ import ghidra.util.task.TaskMonitor;
  * entry R27 holds the address of the procedure's descriptor, which is how
  * the code reaches its linkage section, so R27 is set to it in the program
  * context at each entry.
+ *
+ * <p>Each import gets an external function or data location, found by its
+ * symbol vector offset in the global symbol table of the shareable image
+ * that exports it, which is looked for beside the image and in the library
+ * search paths. Slots in SYS$BASE_IMAGE are named from the executive images
+ * beside it, which fill them. Each fixup puts the address of the import's
+ * thunk or data cell in its linkage pair or address cell.
  *
  * <p>Images with relocations, such as shareable and executive images linked
  * at 0, can be loaded at a chosen base. Executive images default to the
@@ -104,7 +112,8 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 		if (h == null) {
 			throw new IOException("Not an OpenVMS Alpha image");
 		}
-		Image image = new Image(program, r, h, settings.log(), settings.monitor());
+		Image image = new Image(program, r, h, settings.provider().getFile(), settings.log(),
+			settings.monitor());
 		if (h.relocatable) {
 			image.delta = parseBase(settings.options(), h) - h.linkedBase;
 		}
@@ -340,11 +349,17 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 		static final Set<Integer> READ_ONLY = Set.of(0, 3, 7, 11, 15);
 
 		// Relocation types recorded for the fixups.
-		static final int FIX_QREL = 1, FIX_LREL = 2;
+		static final int FIX_QREL = 1, FIX_LREL = 2, FIX_QDOTADR = 3, FIX_LDOTADR = 4,
+				FIX_CODEADR = 5, FIX_LP = 6;
+
+		static final Set<String> NO_RETURN = Set.of("SYS$EXIT", "LIB$STOP", "DECC$EXIT",
+			"DECC$_EXIT", "DECC$ABORT", "DECC$LONGJMP", "DECC$_LONGJMP", "DECC$SIGLONGJMP",
+			"DECC$__UTC_EXIT", "CMA$THREAD_EXIT");
 
 		final Program program;
 		final BinaryReader r;
 		final Header h;
+		final File file;
 		final MessageLog log;
 		final TaskMonitor monitor;
 		final AddressSpace space;
@@ -357,10 +372,12 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 		final Map<Long, Long> pds = new TreeMap<>(Long::compareUnsigned);
 		DataType pdscType;
 
-		Image(Program program, BinaryReader r, Header h, MessageLog log, TaskMonitor monitor) {
+		Image(Program program, BinaryReader r, Header h, File file, MessageLog log,
+				TaskMonitor monitor) {
 			this.program = program;
 			this.r = r;
 			this.h = h;
+			this.file = file;
 			this.log = log;
 			this.monitor = monitor;
 			this.space = program.getAddressFactory().getDefaultAddressSpace();
@@ -381,15 +398,21 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 
 		void load() throws IOException, CancelledException {
 			createBlocks();
-			if (h.fixups != null) {
-				Eiaf eiaf = new Eiaf((h.fixups.vbn() - 1L) * BLOCK, h.fixups.size());
+			Eiaf eiaf = h.fixups == null ? null
+					: new Eiaf((h.fixups.vbn() - 1L) * BLOCK, h.fixups.size());
+			if (eiaf != null) {
 				relocate(eiaf, eiaf.field(32), 8, FIX_QREL);
 				relocate(eiaf, eiaf.field(36), 4, FIX_LREL);
 				changeProtection(eiaf);
 			}
 			labelGlobals(readGst(r, h));
 			transferAddresses();
+			// Before the imports overwrite their linkage pairs with thunk
+			// addresses, which can look like descriptors.
 			scanForPds();
+			if (eiaf != null) {
+				imports(eiaf);
+			}
 		}
 
 		void createBlocks() throws IOException, CancelledException {
@@ -674,6 +697,285 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 				}
 				n++;
 			}
+		}
+
+		/** A reference from the image to a symbol another image exports. */
+		record Fixup(int type, int image, long at, long svo) {
+		}
+
+		/** An imported symbol and where its thunk or cell is. */
+		record Import(ExternalLocation loc, Address slot) {
+		}
+
+		/**
+		 * Linkage pairs, code addresses and .address cells that refer to
+		 * other images. Each fixup list is a run of groups: a count, the
+		 * index of the shareable image, then the locations.
+		 */
+		void imports(Eiaf eiaf) throws IOException, CancelledException {
+			List<String> shl = new ArrayList<>();
+			long shlOff = eiaf.field(60);
+			long shlCount = eiaf.field(64);
+			for (long i = 0; i < shlCount && eiaf.contains(shlOff + 64 * i, 64); i++) {
+				long o = eiaf.base + shlOff + 64 * i;
+				shl.add(r.readAsciiString(o + 25, Math.min(39, r.readUnsignedByte(o + 24))));
+			}
+			if (shl.isEmpty()) {
+				return;
+			}
+
+			List<Fixup> fixups = new ArrayList<>();
+			referenceFixups(eiaf, eiaf.field(52), 4, FIX_LP, fixups);
+			// Linkage pairs whose calls carry a procedure signature block,
+			// as LIBRTL's calls into SYS$PUBLIC_VECTORS do. Each entry is
+			// the linkage pair and the address of its signature block.
+			referenceFixups(eiaf, eiaf.field(80), 8, FIX_LP, fixups);
+			referenceFixups(eiaf, eiaf.field(48), 4, FIX_CODEADR, fixups);
+			addressFixups(eiaf, eiaf.field(40), FIX_QDOTADR, fixups);
+			addressFixups(eiaf, eiaf.field(44), FIX_LDOTADR, fixups);
+			fixups.removeIf(f -> f.image() >= shl.size() || !memory.contains(addr(f.at())));
+			if (fixups.isEmpty()) {
+				return;
+			}
+
+			Map<String, Map<Long, GlobalSymbol>> exports = new HashMap<>();
+			Map<List<Long>, Import> imports = new HashMap<>();
+			Address slots = createExternalBlock(
+				fixups.stream().map(f -> List.of((long) f.image(), f.svo())).distinct().count());
+			if (slots == null) {
+				return;
+			}
+			ExternalManager ext = program.getExternalManager();
+			ReferenceManager refs = program.getReferenceManager();
+			int n = 0;
+			for (Fixup f : fixups) {
+				monitor.checkCancelled();
+				List<Long> key = List.of((long) f.image(), f.svo());
+				Import imp = imports.get(key);
+				if (imp == null) {
+					String lib = shl.get(f.image());
+					Map<Long, GlobalSymbol> syms = exports.computeIfAbsent(lib, this::exports);
+					GlobalSymbol sym = syms.get(f.svo());
+					String name = sym != null ? sym.name()
+							: String.format("%s_%X", lib.replaceFirst("^SYS\\$", ""), f.svo());
+					boolean proc = sym != null ? sym.isProcedure() : f.type() == FIX_LP ||
+						f.type() == FIX_CODEADR;
+					imp = newImport(ext, lib, name, proc, slots.add(8L * n++));
+					if (imp == null) {
+						continue;
+					}
+					imports.put(key, imp);
+				}
+				write(f, imp, refs);
+			}
+		}
+
+		void referenceFixups(Eiaf eiaf, long off, int stride, int type, List<Fixup> out)
+				throws IOException {
+			while (eiaf.contains(off, 8)) {
+				long count = r.readUnsignedInt(eiaf.base + off);
+				int image = r.readInt(eiaf.base + off + 4);
+				if (count == 0) {
+					return;
+				}
+				off += 8;
+				for (long j = 0; j < count && eiaf.contains(off, stride); j++, off += stride) {
+					long at = rva(r.readUnsignedInt(eiaf.base + off));
+					// The location holds the symbol vector offset of the target.
+					try {
+						out.add(new Fixup(type, image, at, memory.getLong(addr(at))));
+					}
+					catch (Exception e) {
+						log.appendMsg("Cannot read the fixup at " + addr(at));
+					}
+				}
+			}
+		}
+
+		void addressFixups(Eiaf eiaf, long off, int type, List<Fixup> out) throws IOException {
+			while (eiaf.contains(off, 8)) {
+				long count = r.readUnsignedInt(eiaf.base + off);
+				int image = r.readInt(eiaf.base + off + 4);
+				if (count == 0) {
+					return;
+				}
+				off += 8;
+				for (long j = 0; j < count && eiaf.contains(off, 8); j++, off += 8) {
+					out.add(new Fixup(type, image, rva(r.readUnsignedInt(eiaf.base + off)),
+						r.readUnsignedInt(eiaf.base + off + 4)));
+				}
+			}
+		}
+
+		Import newImport(ExternalManager ext, String lib, String name, boolean proc,
+				Address slot) {
+			try {
+				ExternalLocation loc;
+				if (proc) {
+					loc = ext.addExtFunction(lib, name, null, SourceType.IMPORTED);
+					if (NO_RETURN.contains(name)) {
+						loc.getFunction().setNoReturn(true);
+					}
+					Function f = program.getFunctionManager()
+							.createFunction(name, slot, new AddressSet(slot), SourceType.IMPORTED);
+					f.setThunkedFunction(loc.getFunction());
+				}
+				else {
+					loc = ext.addExtLocation(lib, name, null, SourceType.IMPORTED);
+					symbols.createLabel(slot, name, SourceType.IMPORTED);
+				}
+				return new Import(loc, slot);
+			}
+			catch (Exception e) {
+				log.appendMsg("Cannot create import " + lib + " " + name + ": " + e.getMessage());
+				return null;
+			}
+		}
+
+		/**
+		 * Point a fixup at its import's slot. Calls through read-only cells
+		 * fold to the thunk. Writable cells, as in executive images, do not,
+		 * so they get an external reference instead. The decompiler fails
+		 * on a function that reaches one external through different cells,
+		 * so the read-only cells do not get one.
+		 */
+		void write(Fixup f, Import imp, ReferenceManager refs) {
+			Address at = addr(f.at());
+			long slot = imp.slot().getOffset();
+			try {
+				int len = 8;
+				if (f.type() == FIX_LDOTADR) {
+					if ((int) slot != slot) {
+						log.appendMsg("Import slot " + imp.slot() + " does not fit at " + at);
+					}
+					memory.setInt(at, (int) slot);
+					len = 4;
+				}
+				else {
+					memory.setLong(at, slot);
+					pointer(at);
+					if (f.type() == FIX_LP) {
+						memory.setLong(at.add(8), slot);
+						pointer(at.add(8));
+						len = 16;
+					}
+				}
+				program.getRelocationTable()
+						.add(at, Status.APPLIED, f.type(), new long[] { f.image(), f.svo() }, len,
+							imp.loc().getLabel());
+				refs.removeAllReferencesFrom(at);
+				boolean call = f.type() == FIX_LP || f.type() == FIX_CODEADR;
+				MemoryBlock block = memory.getBlock(at);
+				if (call && block != null && !block.isWrite()) {
+					refs.addMemoryReference(at, imp.slot(), RefType.DATA, SourceType.IMPORTED, 0);
+				}
+				else {
+					refs.addExternalReference(at, 0, imp.loc(), SourceType.IMPORTED,
+						call ? RefType.COMPUTED_CALL : RefType.DATA);
+				}
+			}
+			catch (Exception e) {
+				log.appendMsg("Cannot apply the fixup at " + at + ": " + e.getMessage());
+			}
+		}
+
+		void pointer(Address at) {
+			try {
+				DataUtilities.createData(program, at, PointerDataType.dataType, 8,
+					ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
+			}
+			catch (Exception e) {
+				// leave it undefined
+			}
+		}
+
+		Address createExternalBlock(long count) {
+			long end = 0;
+			for (MemoryBlock b : memory.getBlocks()) {
+				end = Math.max(end, b.getEnd().getOffset() + 1);
+			}
+			Address start = addr((end + 0xffff) & ~0xffffL);
+			MemoryBlock b = MemoryBlockUtils.createUninitializedBlock(program, false,
+				MemoryBlock.EXTERNAL_BLOCK_NAME, start, 8L * count,
+				"Thunks for imported procedures and cells for imported data", NAME, true, false,
+				false, log);
+			if (b == null) {
+				return null;
+			}
+			b.setArtificial(true);
+			return start;
+		}
+
+		/** What a shareable image exports, by symbol vector offset. */
+		Map<Long, GlobalSymbol> exports(String lib) {
+			Map<Long, GlobalSymbol> out = new HashMap<>();
+			File f = findImage(lib);
+			if (f == null) {
+				log.appendMsg("Cannot find " + lib + ".EXE; its imports are named by offset");
+				return out;
+			}
+			for (GlobalSymbol s : globals(f)) {
+				if (!s.symv() && (s.flags() & GlobalSymbol.DEF) != 0) {
+					out.putIfAbsent(s.value(), s);
+				}
+			}
+			// The executive images fill most of the base image's symbol
+			// vector, which its own symbol table leaves out.
+			if (lib.equalsIgnoreCase("SYS$BASE_IMAGE")) {
+				File[] dir = f.getParentFile().listFiles();
+				for (File exec : dir == null ? new File[0] : dir) {
+					if (exec.isFile() && imageName(exec.getName()).endsWith(".EXE")) {
+						for (GlobalSymbol s : globals(exec)) {
+							if (s.symv()) {
+								out.putIfAbsent(Integer.toUnsignedLong(s.vector()), s);
+							}
+						}
+					}
+				}
+			}
+			return out;
+		}
+
+		static String imageName(String fileName) {
+			// ODS-2 file names may carry a version.
+			return fileName.replaceFirst(";\\d*$", "").toUpperCase(Locale.ROOT);
+		}
+
+		List<GlobalSymbol> globals(File f) {
+			try (ByteProvider p = new FileByteProvider(f, null, AccessMode.READ)) {
+				BinaryReader lr = new BinaryReader(p, true);
+				Header lh = Header.parse(lr);
+				return lh == null ? List.of() : readGst(lr, lh);
+			}
+			catch (IOException e) {
+				log.appendMsg("Cannot read " + f + ": " + e.getMessage());
+				return List.of();
+			}
+		}
+
+		/** The shareable image beside this one or in a library search path. */
+		File findImage(String lib) {
+			List<File> dirs = new ArrayList<>();
+			File own = file == null ? null : file.getParentFile();
+			if (own != null) {
+				dirs.add(own);
+			}
+			for (String path : LibrarySearchPathManager.getLibraryPaths()) {
+				File d = new File(path);
+				if (d.isAbsolute()) {
+					dirs.add(d);
+				}
+			}
+			String want = lib.toUpperCase(Locale.ROOT) + ".EXE";
+			for (File d : dirs) {
+				File[] files = d.listFiles();
+				for (File f : files == null ? new File[0] : files) {
+					if (f.isFile() && imageName(f.getName()).equals(want)) {
+						return f;
+					}
+				}
+			}
+			return null;
 		}
 
 		/**

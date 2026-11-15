@@ -43,6 +43,14 @@ their procedure descriptors, sets R27 to the descriptor on entry so the
 decompiler follows calls through the linkage section, and names symbols
 from the image's global symbol table.
 
+Calls into shareable images (DECC$SHR, LIBRTL, SYS$PUBLIC_VECTORS and
+so on) are named through the image's fixups. To resolve a symbol
+vector offset to a name, the loader looks for the shareable image
+beside the file being imported, then in each absolute directory in
+Ghidra's library search paths (for example a copy of `SYS$LIBRARY`).
+When an image cannot be found, the import is named `IMAGE_OFFSET`,
+e.g. `DECC$SHR_46F0`.
+
 Shareable images linked at address 0 and executive images can be loaded
 at any base. The "Image base" option picks it (defaulting to 0x10000
 for shareable images and 0xffffffff80000000 for executive images), and
