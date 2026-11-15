@@ -344,6 +344,10 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 	private static class Image {
 		// Procedure descriptor kinds.
 		static final int PDSC_KIND_NULL = 8, PDSC_KIND_FP_STACK = 9, PDSC_KIND_FP_REGISTER = 10;
+		/** A flag that must be zero, but is often set in the low word of a pointer. */
+		static final int PDSC_FLAGS_RESERVED = 0x8000;
+		/** The size of a stack frame procedure descriptor without a handler. */
+		static final long PDSC_STACK_SIZE = 32;
 
 		// Memory protection codes that allow no write access.
 		static final Set<Integer> READ_ONLY = Set.of(0, 3, 7, 11, 15);
@@ -366,6 +370,7 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 		final Memory memory;
 		final SymbolTable symbols;
 		final Register pvReg;
+		boolean mixed;
 		/** Where the image is loaded minus where it was linked. */
 		long delta;
 		/** Procedure descriptors found, by address, with their entries. */
@@ -419,12 +424,16 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 			FileBytes fileBytes = MemoryBlockUtils.createFileBytes(program, r.getByteProvider(),
 				monitor);
 			long len = r.length();
+			// A bootstrap image such as APB is one section of code and data
+			// with no EXE flag. Treat its initialized sections as code.
+			mixed = h.eisds.stream()
+					.noneMatch(e -> mapped(e) && (e.flags() & Eisd.EXE) != 0);
 			int n = 0;
 			for (Eisd e : h.eisds) {
-				if (e.isGlobal() || e.type() == Eisd.TYPE_USRSTACK || e.size() == 0) {
+				if (!mapped(e)) {
 					continue;
 				}
-				boolean exec = (e.flags() & Eisd.EXE) != 0;
+				boolean exec = (e.flags() & Eisd.EXE) != 0 || (mixed && e.vbn() != 0);
 				boolean write = (e.flags() & Eisd.WRT) != 0;
 				String name = ((e.flags() & Eisd.FIXUPVEC) != 0 ? "fixups"
 						: exec ? "code" : e.vbn() == 0 ? "zero" : "data") + "_" + n++;
@@ -449,6 +458,11 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 					log.appendMsg("Skipping section " + name + ": " + x.getMessage());
 				}
 			}
+		}
+
+		/** Whether a section is part of this image's address space. */
+		static boolean mapped(Eisd e) {
+			return !e.isGlobal() && e.type() != Eisd.TYPE_USRSTACK && e.size() != 0;
 		}
 
 		/** The image activator fixup section (EIAF). */
@@ -564,8 +578,10 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 			}
 			try {
 				Address a = addr(pd);
-				int kind = memory.getShort(a) & 0xf;
-				if (kind < PDSC_KIND_NULL || kind > PDSC_KIND_FP_REGISTER) {
+				int flags = memory.getShort(a);
+				int kind = flags & 0xf;
+				if (kind < PDSC_KIND_NULL || kind > PDSC_KIND_FP_REGISTER ||
+					(flags & PDSC_FLAGS_RESERVED) != 0) {
 					return null;
 				}
 				long entry = memory.getLong(a.add(8));
@@ -608,7 +624,7 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 					// leave it undefined
 				}
 				Address e = addr(entry);
-				AbstractProgramLoader.markAsFunction(program, null, e);
+				markFunction(e);
 				try {
 					program.getProgramContext().setValue(pvReg, e, e,
 						new BigInteger(Long.toUnsignedString(pd)));
@@ -622,6 +638,15 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 				label(entry, name);
 			}
 			return addr(entry);
+		}
+
+		void markFunction(Address entry) {
+			try {
+				AbstractProgramLoader.markAsFunction(program, null, entry);
+			}
+			catch (IllegalArgumentException e) {
+				log.appendMsg("Cannot mark the procedure at " + entry + ": " + e.getMessage());
+			}
 		}
 
 		/** The fixed part of a procedure descriptor. */
@@ -989,7 +1014,7 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 			Set<Long> linked = new HashSet<>();
 			for (int pass = 0; pass < 2; pass++) {
 				for (MemoryBlock b : memory.getBlocks()) {
-					if (b.isExecute() || !b.isInitialized()) {
+					if (b.isExecute() && !mixed || !b.isInitialized()) {
 						continue;
 					}
 					long end = b.getEnd().getOffset() + 1;
@@ -1017,6 +1042,15 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 				}
 			}
 
+			// A false descriptor's entry often points into a real one.
+			TreeSet<Long> starts = new TreeSet<>(Long::compareUnsigned);
+			starts.addAll(found.keySet());
+			starts.addAll(pds.keySet());
+			found.values().removeIf(entry -> {
+				Long pd = starts.floor(entry);
+				return pd != null && Long.compareUnsigned(entry - pd, PDSC_STACK_SIZE) < 0;
+			});
+
 			Set<Long> known = new HashSet<>(pds.values());
 			Map<Long, List<Long>> byEntry = new LinkedHashMap<>();
 			for (Map.Entry<Long, Long> e : found.entrySet()) {
@@ -1033,7 +1067,7 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 					procedure(candidates.get(0), null);
 				}
 				else {
-					AbstractProgramLoader.markAsFunction(program, null, addr(e.getKey()));
+					markFunction(addr(e.getKey()));
 				}
 			}
 		}
