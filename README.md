@@ -42,3 +42,8 @@ shareable images and executive images. It finds procedures through
 their procedure descriptors, sets R27 to the descriptor on entry so the
 decompiler follows calls through the linkage section, and names symbols
 from the image's global symbol table.
+
+Shareable images linked at address 0 and executive images can be loaded
+at any base. The "Image base" option picks it (defaulting to 0x10000
+for shareable images and 0xffffffff80000000 for executive images), and
+the loader applies the image's relocations to match.

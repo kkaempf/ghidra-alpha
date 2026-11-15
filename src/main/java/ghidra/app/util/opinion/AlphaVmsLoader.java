@@ -20,9 +20,11 @@ import java.math.BigInteger;
 import java.util.*;
 
 import ghidra.app.util.MemoryBlockUtils;
+import ghidra.app.util.Option;
 import ghidra.app.util.bin.BinaryReader;
 import ghidra.app.util.bin.ByteProvider;
 import ghidra.app.util.importer.MessageLog;
+import ghidra.framework.model.DomainObject;
 import ghidra.program.database.mem.FileBytes;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSpace;
@@ -32,6 +34,7 @@ import ghidra.program.model.lang.*;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
 import ghidra.program.model.mem.MemoryBlock;
+import ghidra.program.model.reloc.Relocation.Status;
 import ghidra.program.model.symbol.SourceType;
 import ghidra.program.model.symbol.SymbolTable;
 import ghidra.util.exception.CancelledException;
@@ -50,10 +53,19 @@ import ghidra.util.task.TaskMonitor;
  * entry R27 holds the address of the procedure's descriptor, which is how
  * the code reaches its linkage section, so R27 is set to it in the program
  * context at each entry.
+ *
+ * <p>Images with relocations, such as shareable and executive images linked
+ * at 0, can be loaded at a chosen base. Executive images default to the
+ * start of system space, and others to the lowest address a user image is
+ * normally linked at.
  */
 public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 
 	public static final String NAME = "OpenVMS Alpha image";
+	public static final String OPTION_BASE = "Image base";
+
+	static final long USER_BASE = 0x10000L;
+	static final long SYSTEM_BASE = 0xffffffff80000000L;
 
 	static final int EIHD_LENGTH = 104;
 	static final int BLOCK = 512;
@@ -76,7 +88,7 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 				continue;
 			}
 			for (CompilerSpecDescription cs : ld.getCompatibleCompilerSpecDescriptions()) {
-				specs.add(new LoadSpec(this, h.linkedBase,
+				specs.add(new LoadSpec(this, h.defaultBase(),
 					new LanguageCompilerSpecPair(ld.getLanguageID(), cs.getCompilerSpecID()),
 					id.startsWith("21264:")));
 			}
@@ -92,7 +104,65 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 		if (h == null) {
 			throw new IOException("Not an OpenVMS Alpha image");
 		}
-		new Image(program, r, h, settings.log(), settings.monitor()).load();
+		Image image = new Image(program, r, h, settings.log(), settings.monitor());
+		if (h.relocatable) {
+			image.delta = parseBase(settings.options(), h) - h.linkedBase;
+		}
+		image.load();
+	}
+
+	@Override
+	public List<Option> getDefaultOptions(ByteProvider provider, LoadSpec loadSpec,
+			DomainObject domainObject, boolean loadIntoProgram, boolean mirrorFsLayout) {
+		List<Option> options = super.getDefaultOptions(provider, loadSpec, domainObject,
+			loadIntoProgram, mirrorFsLayout);
+		try {
+			Header h = Header.parse(new BinaryReader(provider, true));
+			if (h != null && h.relocatable && !loadIntoProgram) {
+				options.add(new Option(OPTION_BASE, "0x" + Long.toHexString(h.defaultBase())));
+			}
+		}
+		catch (IOException e) {
+			// no base option
+		}
+		return options;
+	}
+
+	@Override
+	public String validateOptions(ByteProvider provider, LoadSpec loadSpec, List<Option> options,
+			Program program) {
+		for (Option o : options) {
+			if (o.getName().equals(OPTION_BASE)) {
+				try {
+					long base = parseHex(String.valueOf(o.getValue()));
+					if ((base & 0xffff) != 0) {
+						return OPTION_BASE + " must be a multiple of 0x10000";
+					}
+				}
+				catch (NumberFormatException e) {
+					return OPTION_BASE + " must be a hexadecimal address";
+				}
+				break;
+			}
+		}
+		return super.validateOptions(provider, loadSpec, options, program);
+	}
+
+	static long parseBase(List<Option> options, Header h) {
+		for (Option o : options == null ? List.<Option> of() : options) {
+			if (o.getName().equals(OPTION_BASE)) {
+				return parseHex(String.valueOf(o.getValue()));
+			}
+		}
+		return h.defaultBase();
+	}
+
+	static long parseHex(String text) {
+		text = text.trim();
+		if (text.startsWith("0x") || text.startsWith("0X")) {
+			text = text.substring(2);
+		}
+		return Long.parseUnsignedLong(text, 16);
 	}
 
 	/** An image section descriptor (EISD). */
@@ -113,6 +183,19 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 		/** The lowest section address, which fixup offsets are relative to. */
 		long linkedBase = -1;
 		Eisd fixups;
+		/** Whether the image activator relocates the image. */
+		boolean relocatable;
+
+		boolean isExecutive() {
+			return imgtype == 2 && subtype == 0 && sysver != 0;
+		}
+
+		long defaultBase() {
+			if (!relocatable || linkedBase != 0) {
+				return linkedBase;
+			}
+			return isExecutive() ? SYSTEM_BASE : USER_BASE;
+		}
 
 		/** The header, or null if this is not an OpenVMS Alpha image. */
 		static Header parse(BinaryReader r) throws IOException {
@@ -169,7 +252,15 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 				}
 				o += eisdsize;
 			}
-			return h.linkedBase == -1 ? null : h;
+			if (h.linkedBase == -1) {
+				return null;
+			}
+			if (h.fixups != null) {
+				long eiaf = (h.fixups.vbn() - 1L) * BLOCK;
+				h.relocatable = eiaf + 40 <= len &&
+					(r.readInt(eiaf + 32) != 0 || r.readInt(eiaf + 36) != 0);
+			}
+			return h;
 		}
 
 		/** File offset of the global symbol table, or -1. */
@@ -248,6 +339,9 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 		// Memory protection codes that allow no write access.
 		static final Set<Integer> READ_ONLY = Set.of(0, 3, 7, 11, 15);
 
+		// Relocation types recorded for the fixups.
+		static final int FIX_QREL = 1, FIX_LREL = 2;
+
 		final Program program;
 		final BinaryReader r;
 		final Header h;
@@ -289,6 +383,8 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 			createBlocks();
 			if (h.fixups != null) {
 				Eiaf eiaf = new Eiaf((h.fixups.vbn() - 1L) * BLOCK, h.fixups.size());
+				relocate(eiaf, eiaf.field(32), 8, FIX_QREL);
+				relocate(eiaf, eiaf.field(36), 4, FIX_LREL);
 				changeProtection(eiaf);
 			}
 			labelGlobals(readGst(r, h));
@@ -348,6 +444,51 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 
 			boolean contains(long off, long n) {
 				return off > 0 && off + n <= size;
+			}
+		}
+
+		/**
+		 * Relocation records are a bit count and a base offset, then a bitmap
+		 * with a bit for each quadword or longword from the base that holds
+		 * an address relative to the image base.
+		 */
+		void relocate(Eiaf eiaf, long off, int stride, int type)
+				throws IOException, CancelledException {
+			while (eiaf.contains(off, 8)) {
+				long count = r.readUnsignedInt(eiaf.base + off);
+				long base = r.readUnsignedInt(eiaf.base + off + 4);
+				if (count == 0) {
+					return;
+				}
+				off += 8;
+				for (long word = 0; word * 32 < count && eiaf.contains(off, 4); word++, off += 4) {
+					monitor.checkCancelled();
+					int bits = r.readInt(eiaf.base + off);
+					for (int k = 0; k < 32; k++) {
+						if ((bits & (1 << k)) != 0) {
+							relocateAt(addr(rva(base + (word * 32 + k) * stride)), stride, type);
+						}
+					}
+				}
+			}
+		}
+
+		void relocateAt(Address at, int stride, int type) {
+			try {
+				long old = stride == 8 ? memory.getLong(at) : memory.getInt(at);
+				if (delta != 0) {
+					if (stride == 8) {
+						memory.setLong(at, old + delta);
+					}
+					else {
+						memory.setInt(at, (int) (old + delta));
+					}
+				}
+				program.getRelocationTable()
+						.add(at, Status.APPLIED, type, new long[] { old }, stride, null);
+			}
+			catch (Exception e) {
+				log.appendMsg("Cannot relocate " + at + ": " + e.getMessage());
 			}
 		}
 
