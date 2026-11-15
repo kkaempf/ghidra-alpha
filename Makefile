@@ -37,6 +37,9 @@ SLEIGH ?= sleigh
 test:
 	make -C tests
 
+emutest: nt unix vms
+	make -C tests emu
+
 # Java analyzer (gp-relative reference recovery). Compiled against the jars of
 # an installed Ghidra and packaged as lib/Alpha.jar, which Ghidra discovers
 # automatically for this processor module.
