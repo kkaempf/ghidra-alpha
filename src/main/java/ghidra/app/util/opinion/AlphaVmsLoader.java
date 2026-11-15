@@ -535,19 +535,62 @@ public class AlphaVmsLoader extends AbstractProgramWrapperLoader {
 			}
 		}
 
-		/** Procedure descriptors anywhere in the initialized data. */
+		/**
+		 * Procedure descriptors anywhere in the initialized data. The tail of
+		 * one linkage pair and the entry of the next can look like a
+		 * descriptor for the same procedure, so when several point at one
+		 * entry, take the one a linkage pair (entry, descriptor) refers to.
+		 */
 		void scanForPds() throws CancelledException {
-			for (MemoryBlock b : memory.getBlocks()) {
-				if (b.isExecute() || !b.isInitialized()) {
-					continue;
-				}
-				long start = (b.getStart().getOffset() + 7) & ~7L;
-				for (long a = start; Long.compareUnsigned(a + 16, b.getEnd().getOffset() + 1) <= 0;
-						a += 8) {
-					monitor.checkCancelled();
-					if (pds.containsKey(a) || pdEntry(a) != null && procedure(a, null) != null) {
-						a += 8;
+			Map<Long, Long> found = new LinkedHashMap<>();
+			Set<Long> linked = new HashSet<>();
+			for (int pass = 0; pass < 2; pass++) {
+				for (MemoryBlock b : memory.getBlocks()) {
+					if (b.isExecute() || !b.isInitialized()) {
+						continue;
 					}
+					long end = b.getEnd().getOffset() + 1;
+					for (long a = (b.getStart().getOffset() + 7) & ~7L;
+							Long.compareUnsigned(a + 16, end) <= 0; a += 8) {
+						monitor.checkCancelled();
+						if (pass == 0) {
+							Long entry = pdEntry(a);
+							if (entry != null) {
+								found.put(a, entry);
+							}
+							continue;
+						}
+						try {
+							long pd = memory.getLong(addr(a + 8));
+							Long entry = found.get(pd);
+							if (entry != null && entry == memory.getLong(addr(a))) {
+								linked.add(pd);
+							}
+						}
+						catch (Exception e) {
+							// not a linkage pair
+						}
+					}
+				}
+			}
+
+			Set<Long> known = new HashSet<>(pds.values());
+			Map<Long, List<Long>> byEntry = new LinkedHashMap<>();
+			for (Map.Entry<Long, Long> e : found.entrySet()) {
+				if (!known.contains(e.getValue())) {
+					byEntry.computeIfAbsent(e.getValue(), k -> new ArrayList<>()).add(e.getKey());
+				}
+			}
+			for (Map.Entry<Long, List<Long>> e : byEntry.entrySet()) {
+				List<Long> candidates = e.getValue();
+				if (candidates.size() > 1) {
+					candidates.removeIf(pd -> !linked.contains(pd));
+				}
+				if (candidates.size() == 1) {
+					procedure(candidates.get(0), null);
+				}
+				else {
+					AbstractProgramLoader.markAsFunction(program, null, addr(e.getKey()));
 				}
 			}
 		}
