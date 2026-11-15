@@ -793,33 +793,19 @@ define pcodeop cvt_q_to_g;
 :CVTQF^vaxqual  Fb, Fc is opcode=0x15 & fp_lo=0x3c & vaxqual  & fa=31 & Fb & Fc { Fc = cvt_q_to_f(Fb); }
 :CVTQG^vaxqual  Fb, Fc is opcode=0x15 & fp_lo=0x3e & vaxqual  & fa=31 & Fb & Fc { Fc = cvt_q_to_g(Fb); }
 
-# set complete bytes to zero
+# Zero byte i of src when bit i of bits is set. The mask is built without
+# branches so that a constant operand folds to a constant mask in the
+# decompiler.
 macro zap(src, dest, bits) {
-  dest = src;
-  if ((bits & 0x01) == 0) goto <nozap0>;
-  dest[0,8] = 0;
-<nozap0>
-  if ((bits & 0x02) == 0) goto <nozap1>;
-  dest[8,8] = 0;
-<nozap1>
-  if ((bits & 0x04) == 0) goto <nozap2>;
-  dest[16,8] = 0;
-<nozap2>
-  if ((bits & 0x08) == 0) goto <nozap3>;
-  dest[24,8] = 0;
-<nozap3>
-  if ((bits & 0x01) == 0) goto <nozap4>;
-  dest[32,8] = 0;
-<nozap4>
-  if ((bits & 0x02) == 0) goto <nozap5>;
-  dest[40,8] = 0;
-<nozap5>
-  if ((bits & 0x04) == 0) goto <nozap6>;
-  dest[48,8] = 0;
-<nozap6>
-  if ((bits & 0x08) == 0) goto <nozap7>;
-  dest[56,8] = 0;
-<nozap7>
+  local mask:8 = (zext(bits[0,1]) * 0x00000000000000ff)
+               | (zext(bits[1,1]) * 0x000000000000ff00)
+               | (zext(bits[2,1]) * 0x0000000000ff0000)
+               | (zext(bits[3,1]) * 0x00000000ff000000)
+               | (zext(bits[4,1]) * 0x000000ff00000000)
+               | (zext(bits[5,1]) * 0x0000ff0000000000)
+               | (zext(bits[6,1]) * 0x00ff000000000000)
+               | (zext(bits[7,1]) * 0xff00000000000000);
+  dest = src & ~mask;
 }
 
 # zero bytes
