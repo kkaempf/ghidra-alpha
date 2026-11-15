@@ -30,63 +30,81 @@
     <register name="RA"/>
   </returnaddress>
   <default_proto>
-    <prototype name="__stdcall" extrapop="unknown" stackshift="8" strategy="register">
+    <prototype name="__stdcall" extrapop="0" stackshift="0" strategy="register">
       <input pointermax="8">
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="a0"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="a1"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="a2"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="a3"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="a4"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="a5"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="f16"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="f17"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="f18"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="f19"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="f20"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8" align="8">
-          <register name="f21"/>
+        <group>
+          <pentry minsize="1" maxsize="8" align="8" metatype="float">
+            <register name="f16"/>
+          </pentry>
+          <pentry minsize="1" maxsize="8" align="8">
+            <register name="a0"/>
+          </pentry>
+        </group>
+        <group>
+          <pentry minsize="1" maxsize="8" align="8" metatype="float">
+            <register name="f17"/>
+          </pentry>
+          <pentry minsize="1" maxsize="8" align="8">
+            <register name="a1"/>
+          </pentry>
+        </group>
+        <group>
+          <pentry minsize="1" maxsize="8" align="8" metatype="float">
+            <register name="f18"/>
+          </pentry>
+          <pentry minsize="1" maxsize="8" align="8">
+            <register name="a2"/>
+          </pentry>
+        </group>
+        <group>
+          <pentry minsize="1" maxsize="8" align="8" metatype="float">
+            <register name="f19"/>
+          </pentry>
+          <pentry minsize="1" maxsize="8" align="8">
+            <register name="a3"/>
+          </pentry>
+        </group>
+        <group>
+          <pentry minsize="1" maxsize="8" align="8" metatype="float">
+            <register name="f20"/>
+          </pentry>
+          <pentry minsize="1" maxsize="8" align="8">
+            <register name="a4"/>
+          </pentry>
+        </group>
+        <group>
+          <pentry minsize="1" maxsize="8" align="8" metatype="float">
+            <register name="f21"/>
+          </pentry>
+          <pentry minsize="1" maxsize="8" align="8">
+            <register name="a5"/>
+          </pentry>
+        </group>
+        <pentry minsize="1" maxsize="500" align="8">
+          <addr offset="0" space="stack"/>
         </pentry>
       </input>
       <output>
+        <pentry minsize="1" maxsize="8" metatype="float">
+          <register name="f0"/>
+        </pentry>
+        <pentry minsize="1" maxsize="8" metatype="float">
+          <register name="f1"/>
+        </pentry>
         <pentry minsize="1" maxsize="8">
           <register name="v0"/>
         </pentry>
-        <pentry minsize="1" maxsize="8">
-          <register name="f0"/>
-        </pentry>
-        <pentry minsize="1" maxsize="8">
-          <register name="f1"/>
-        </pentry>
       </output>
       <unaffected>
+        <register name="SP"/>
         <register name="s0"/>
         <register name="s1"/>
         <register name="s2"/>
         <register name="s3"/>
         <register name="s4"/>
         <register name="s5"/>
+        <register name="GP"/>
+        <register name="RA"/>
         <register name="FP"/>
         <register name="f2"/>
         <register name="f3"/>
@@ -112,7 +130,6 @@
         <register name="t11"/>
         <register name="pv"/>
         <register name="at"/>
-        <register name="GP"/>
         <register name="f10"/>
         <register name="f11"/>
         <register name="f12"/>

@@ -37,19 +37,19 @@ SLEIGH ?= sleigh
 test:
 	make -C tests
 
-# Java analyzer (gp-relative reference recovery). Compiled against the jars of
-# an installed Ghidra and packaged as lib/Alpha.jar, which Ghidra discovers
-# automatically for this processor module.
+# Java analyzer (gp-relative reference recovery) and ECOFF loader. Compiled
+# against the jars of an installed Ghidra and packaged as lib/Alpha.jar, which
+# Ghidra discovers automatically for this processor module.
 GHIDRA_DIR ?= /usr/share/ghidra
 GHIDRA_CP = $(shell find $(GHIDRA_DIR)/Ghidra -name '*.jar' | tr '\n' ':')
-ANALYZER_SRC = src/main/java/ghidra/app/plugin/core/analysis/AlphaAddressAnalyzer.java
+JAVA_SRC = $(shell find src/main/java -name '*.java')
 
 analyzer: lib/Alpha.jar
 
-lib/Alpha.jar: $(ANALYZER_SRC)
+lib/Alpha.jar: $(JAVA_SRC)
 	rm -rf build/classes
 	mkdir -p build/classes lib
-	javac -cp "$(GHIDRA_CP)" -d build/classes $(ANALYZER_SRC)
+	javac -cp "$(GHIDRA_CP)" -d build/classes $(JAVA_SRC)
 	jar cf $@ -C build/classes .
 
 clean:
