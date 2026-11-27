@@ -40,7 +40,7 @@ test:
 # Java analyzer (gp-relative reference recovery). Compiled against the jars of
 # an installed Ghidra and packaged as lib/Alpha.jar, which Ghidra discovers
 # automatically for this processor module.
-GHIDRA_DIR ?= /usr/share/ghidra
+GHIDRA_DIR ?= /usr/lib64/ghidra
 GHIDRA_CP = $(shell find $(GHIDRA_DIR)/Ghidra -name '*.jar' | tr '\n' ':')
 ANALYZER_SRC = src/main/java/ghidra/app/plugin/core/analysis/AlphaAddressAnalyzer.java
 

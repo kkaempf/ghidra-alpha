@@ -1,20 +1,136 @@
 /* ###
  * IP: GHIDRA
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Apache License, Version 2.0 (the 'License');
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
+ * distributed under the License is distributed on an 'AS IS' BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-apply from: "$rootProject.projectDir/gradle/distributableGhidraModule.gradle"
-apply from: "$rootProject.projectDir/gradle/processorProject.gradle"
-apply plugin: 'eclipse'
+// Builds a Ghidra Extension for a given Ghidra installation.
+//
+// An absolute path to the Ghidra installation directory must be supplied either by setting the
+// GHIDRA_INSTALL_DIR environment variable or Gradle project property:
+//
+//     > export GHIDRA_INSTALL_DIR=<Absolute path to Ghidra>
+//     > gradle
+//
+//         or
+//
+//     > gradle -PGHIDRA_INSTALL_DIR=<Absolute path to Ghidra>
+//
+// Gradle should be invoked from the directory of the project to build.  Please see the
+// application.gradle.version property in <GHIDRA_INSTALL_DIR>/Ghidra/application.properties
+// for the correction version of Gradle to use for the Ghidra installation you specify.
 
-eclipse.project.name = 'Processors Alpha'
+//----------------------START 'DO NOT MODIFY' SECTION------------------------------
+def ghidraInstallDir
+
+if (System.env.GHIDRA_INSTALL_DIR) {
+    ghidraInstallDir = System.env.GHIDRA_INSTALL_DIR
+}
+else if (project.hasProperty('GHIDRA_INSTALL_DIR')) {
+    ghidraInstallDir = project.getProperty('GHIDRA_INSTALL_DIR')
+}
+
+if (ghidraInstallDir) {
+    apply from: new File(ghidraInstallDir).getCanonicalPath() + '/support/buildExtension.gradle'
+}
+else {
+    throw new GradleException('GHIDRA_INSTALL_DIR is not defined!')
+}
+//----------------------END 'DO NOT MODIFY' SECTION-------------------------------
+
+repositories {
+    mavenCentral()
+}
+
+task copySleighSources(type: Sync) {
+    from 'data'
+    into 'build/data'
+
+    preserve {
+        include '*.sla'
+    }
+}
+
+task compileSleigh(type: JavaExec) {
+    description = 'Run sleigh on the MC6800 languages specs.'
+
+    String buildDir = 'build/data/languages'
+    String inputDir = 'data/languages'
+
+    // Get the input files.
+    FileTree inputFiles = fileTree(inputDir).include('*.slaspec', '*.sinc')
+    ArrayList<File> outputFiles = new ArrayList<File>()
+    // Build the list of output .sla files.
+    inputFiles.forEach(file -> {
+         if (file.getPath().endsWith(".slaspec")) {
+            String slaPath = file.getPath().replace(".slaspec", ".sla")
+            slaPath = slaPath.replace(inputDir, buildDir)
+            outputFiles.add(new File(slaPath))
+         }
+        })
+
+    inputs.files(inputFiles)
+        .withPropertyName('sourceFiles')
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.files(outputFiles)
+        .withPropertyName('outputFiles')
+
+    mainClass.set('ghidra.pcodeCPort.slgh_compile.SleighCompile')
+    classpath =
+        fileTree("$ghidraInstallDir/Ghidra/Framework") { include('**/*.jar') } +
+        fileTree("$ghidraInstallDir/Ghidra/Features") { include('**/*.jar') }
+
+    args = ['-u', '-l', '-n', '-t', '-e', '-c', '-f', '-s', '-a', buildDir]
+
+    dependsOn(copySleighSources)
+}
+
+tasks.named('buildExtension') {
+    from('build/data') {
+        into "$project.name/data"
+    }
+
+    dependsOn('compileSleigh')
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+
+    // The tests are dependent on the compiled language files.
+    inputs.files(fileTree('build/data/languages').include('*.sla'))
+
+    dependsOn(compileSleigh)
+}
+
+tasks.withType(JavaCompile) {
+    options.deprecation = true
+    options.compilerArgs += ['-Xlint:unchecked']
+}
+
+// Exclude additional files from the built extension
+buildExtension {
+    exclude 'data/**'
+    exclude '.vscode/**'
+    exclude '.devcontainer/**'
+    exclude 'gradle.properties'
+    exclude '.github/**'
+    exclude 'gradle/**'
+    exclude 'eclipse/**'
+    exclude 'README.md'
+
+    dependsOn(compileSleigh)
+}
+
+// And don't ship the tests.
+zipSource {
+    exclude 'tests/**'
+}
