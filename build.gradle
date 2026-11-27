@@ -36,6 +36,8 @@ apply from: 'gradle/distributableGhidraModule.gradle'
 apply from: 'gradle/processorProject.gradle'
 apply plugin: 'eclipse'
 
+eclipse.project.name = 'Processors Alpha'
+
 def ghidraInstallDir
 def lib64installfolder = '/usr/lib64/ghidra'
 def libinstallfolder = '/usr/lib/ghidra'
