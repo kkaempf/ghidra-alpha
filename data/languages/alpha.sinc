@@ -267,17 +267,17 @@ attach variables [ ldst ] [   _    l    v    lv    q    lq    vq    lvq
 Ra_lhs: rega is rega { export rega; }
 Rc_lhs: regc is regc { export regc; }
 
-Ra: rega is rega { tmp = rega; export tmp; }
-Rb: regb is regb { tmp = regb; export tmp; }
+Ra: rega is rega { local tmp = rega; export tmp; }
+Rb: regb is regb { local tmp = regb; export tmp; }
 Fa: fa is fa { export fa; }
 Fb: fb is fb { export fb; }
 Fc: fc is fc { export fc; }
 @if defined(21064)
 Ix: ibox is ibox { tmp:8 = ibox; export tmp; }
 Ax: abox is abox { tmp:8 = abox; export tmp; }
-Temp: tmpidx is tmpidx { tmp = tmpidx; export tmp; }
-hwaddr: hwdisp(Rb) is hwdisp & Rb & qw=0 { ptr = (Rb + hwdisp) & ~1; export *[ram]:8 ptr; }
-hwaddr: hwdisp(Rb) is hwdisp & Rb & qw=1 { ptr = (Rb + hwdisp) & ~3; export *[ram]:8 ptr; }
+Temp: tmpidx is tmpidx { local tmp = tmpidx; export tmp; }
+hwaddr: hwdisp(Rb) is hwdisp & Rb & qw=0 { local ptr = (Rb + hwdisp) & ~1; export *[ram]:8 ptr; }
+hwaddr: hwdisp(Rb) is hwdisp & Rb & qw=1 { local ptr = (Rb + hwdisp) & ~3; export *[ram]:8 ptr; }
 hwmode: ".l/vir"         is phy=0 & alt=0 & rwc=0 & qw=0 { export 0:8; }
 hwmode: ".q/vir"         is phy=0 & alt=0 & rwc=0 & qw=1 { export 0:8; }
 hwmode: ".l/vir/rwc"     is phy=0 & alt=0 & rwc=1 & qw=0 { export 0:8; }
@@ -365,7 +365,7 @@ fcc: "GT" is ccode=7 & is_i = 0 & Fa { tmp:1 = (Fa f> 0); export tmp; }
 
 # load unaligned memory. ldq_u r31,0(sp) is the canonical UNOP (matches objdump).
 :UNOP is opcode=0x0b & rega=31 & regb=30 & mdisp=0 { }
-:LDQ_U Ra_lhs, disp_regb is opcode=0x0b & Ra_lhs & disp_regb { ptr = disp_regb & ~7; Ra_lhs = *ptr; }
+:LDQ_U Ra_lhs, disp_regb is opcode=0x0b & Ra_lhs & disp_regb { local ptr = disp_regb & ~7; Ra_lhs = *ptr; }
 
 # load memory locked
 :LDL_L  Ra_lhs, disp_regb is opcode=0x2a & Ra_lhs & disp_regb { Ra_lhs = sext(*:4 disp_regb); }
@@ -382,7 +382,7 @@ fcc: "GT" is ccode=7 & is_i = 0 & Fa { tmp:1 = (Fa f> 0); export tmp; }
 :STW  Ra, disp_regb is opcode=0x0d & Ra & disp_regb { *:2 disp_regb = Ra:2; }
 
 # store to unaligned
-:STQ_U  Ra, disp_regb is opcode=0x0f & Ra & disp_regb { ptr = disp_regb & ~7; *ptr = Ra; }
+:STQ_U  Ra, disp_regb is opcode=0x0f & Ra & disp_regb { local ptr = disp_regb & ~7; *ptr = Ra; }
 
 # Prefetch hints: load instructions with the destination register set to 31.
 # More-constrained than the plain loads, so they take precedence.
@@ -423,14 +423,14 @@ define pcodeop prefetch;
 
 # add
 :SEXTL      op, Rc_lhs is opcode=0x10 & ofunc=0x00 & rega=31 & op & Rc_lhs { Rc_lhs = sext(op:4); }
-:ADDL   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x00 & Ra & op & Rc_lhs { tmp = Ra:4 + op:4; Rc_lhs = sext(tmp); }
-:ADDL^"/V"   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x40 & Ra & op & Rc_lhs { tmp = Ra:4 + op:4; Rc_lhs = sext(tmp); }
-:S4ADDL Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x02 & Ra & op & Rc_lhs { tmp = Ra:4 << 2; tmp = tmp + op:4; Rc_lhs = sext(tmp); }
-:S8ADDL Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x12 & Ra & op & Rc_lhs { tmp = Ra:4 << 3; tmp = tmp + op:4; Rc_lhs = sext(tmp); }
+:ADDL   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x00 & Ra & op & Rc_lhs { local tmp = Ra:4 + op:4; Rc_lhs = sext(tmp); }
+:ADDL^"/V"   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x40 & Ra & op & Rc_lhs { local tmp = Ra:4 + op:4; Rc_lhs = sext(tmp); }
+:S4ADDL Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x02 & Ra & op & Rc_lhs { local tmp = Ra:4 << 2; tmp = tmp + op:4; Rc_lhs = sext(tmp); }
+:S8ADDL Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x12 & Ra & op & Rc_lhs { local tmp = Ra:4 << 3; tmp = tmp + op:4; Rc_lhs = sext(tmp); }
 :ADDQ   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x20 & Ra & op & Rc_lhs { Rc_lhs = Ra + op; }
 :ADDQ^"/V"   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x60 & Ra & op & Rc_lhs { Rc_lhs = Ra + op; }
-:S4ADDQ Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x22 & Ra & op & Rc_lhs { tmp = Ra << 2; Rc_lhs = tmp + op; }
-:S8ADDQ Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x32 & Ra & op & Rc_lhs { tmp = Ra << 3; Rc_lhs = tmp + op; }
+:S4ADDQ Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x22 & Ra & op & Rc_lhs { local tmp = Ra << 2; Rc_lhs = tmp + op; }
+:S8ADDQ Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x32 & Ra & op & Rc_lhs { local tmp = Ra << 3; Rc_lhs = tmp + op; }
 
 # compare
 :CMPEQ  Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x2d & Ra & op & Rc_lhs { Rc_lhs = zext(Ra == op); }
@@ -455,15 +455,15 @@ define pcodeop count_trailing_zeros;
 
 # subtract
 :NEGL       op, Rc_lhs is opcode=0x10 & ofunc=0x09 & rega=31 & op & Rc_lhs { Rc_lhs = sext(- op:4); }
-:SUBL   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x09 & Ra & op & Rc_lhs { tmp = Ra:4 - op:4; Rc_lhs = sext(tmp); }
-:SUBL^"/V"   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x49 & Ra & op & Rc_lhs { tmp = Ra:4 - op:4; Rc_lhs = sext(tmp); }
-:S4SUBL Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x0b & Ra & op & Rc_lhs { tmp = Ra:4 << 2; tmp = tmp - op:4; Rc_lhs = sext(tmp); }
-:S8SUBL Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x1b & Ra & op & Rc_lhs { tmp = Ra:4 << 3; tmp = tmp - op:4; Rc_lhs = sext(tmp); }
+:SUBL   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x09 & Ra & op & Rc_lhs { local tmp = Ra:4 - op:4; Rc_lhs = sext(tmp); }
+:SUBL^"/V"   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x49 & Ra & op & Rc_lhs { local tmp = Ra:4 - op:4; Rc_lhs = sext(tmp); }
+:S4SUBL Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x0b & Ra & op & Rc_lhs { local tmp = Ra:4 << 2; tmp = tmp - op:4; Rc_lhs = sext(tmp); }
+:S8SUBL Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x1b & Ra & op & Rc_lhs { local tmp = Ra:4 << 3; tmp = tmp - op:4; Rc_lhs = sext(tmp); }
 :NEGQ       op, Rc_lhs is opcode=0x10 & ofunc=0x29 & rega=31 & op & Rc_lhs { Rc_lhs = - op; }
 :SUBQ   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x29 & Ra & op & Rc_lhs { Rc_lhs = Ra - op; }
 :SUBQ^"/V"   Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x69 & Ra & op & Rc_lhs { Rc_lhs = Ra - op; }
-:S4SUBQ Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x2b & Ra & op & Rc_lhs { tmp = Ra << 2; Rc_lhs = tmp - op; }
-:S8SUBQ Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x3b & Ra & op & Rc_lhs { tmp = Ra << 3; Rc_lhs = tmp - op; }
+:S4SUBQ Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x2b & Ra & op & Rc_lhs { local tmp = Ra << 2; Rc_lhs = tmp - op; }
+:S8SUBQ Ra, op, Rc_lhs is opcode=0x10 & ofunc=0x3b & Ra & op & Rc_lhs { local tmp = Ra << 3; Rc_lhs = tmp - op; }
 
 # logical functions
 :AND   Ra, op, Rc_lhs is opcode=0x11 & ofunc=0x00 & Ra & op & Rc_lhs    { Rc_lhs = Ra & op; }
@@ -930,7 +930,7 @@ define pcodeop call_pal;
 @else
 # EV6+ HW_LD/HW_ST: Rb + signed 12-bit displacement; mode in bits 15:12
 @endif
-hwaddr_ev: hwdisp(Rb) is hwdisp & Rb { d:2 = hwdisp; ptr = Rb + sext(d); export *[ram]:8 ptr; }
+hwaddr_ev: hwdisp(Rb) is hwdisp & Rb { d:2 = hwdisp; local ptr = Rb + sext(d); export *[ram]:8 ptr; }
 :HW_LD rega, hwaddr_ev is opcode=0x1b & rega & hwaddr_ev { rega = hwaddr_ev; }
 :HW_ST rega, hwaddr_ev is opcode=0x1f & rega & hwaddr_ev { hwaddr_ev = rega; }
 @endif
