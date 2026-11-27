@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 // Builds a Ghidra Extension for a given Ghidra installation.
 //
 // An absolute path to the Ghidra installation directory must be supplied either by setting the
@@ -30,6 +31,11 @@
 // for the correction version of Gradle to use for the Ghidra installation you specify.
 
 //----------------------START 'DO NOT MODIFY' SECTION------------------------------
+
+apply from: 'gradle/distributableGhidraModule.gradle'
+apply from: 'gradle/processorProject.gradle'
+apply plugin: 'eclipse'
+
 def ghidraInstallDir
 def lib64installfolder = '/usr/lib64/ghidra'
 def libinstallfolder = '/usr/lib/ghidra'
@@ -49,6 +55,7 @@ else if (file(libinstallfolder).exists()) {
 
 if (ghidraInstallDir) {
     println "Install dir is at " + ghidraInstallDir
+    def canonicalPath = new File(ghidraInstallDir).getCanonicalPath()
     apply from: new File(ghidraInstallDir).getCanonicalPath() + '/support/buildExtension.gradle'
 }
 else {
@@ -139,7 +146,8 @@ buildExtension {
     dependsOn(compileSleigh)
 }
 
-// And don't ship the tests.
+// And don't ship the tests or manuals.
 zipSource {
     exclude 'tests/**'
+    exclude 'data/manuals/*.pdf'
 }
