@@ -1,6 +1,7 @@
 *~
 *.sla
 *.pdf
+.gradle
 core.*
 *.out
 *.outNT

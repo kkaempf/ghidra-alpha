@@ -32,8 +32,6 @@
 
 //----------------------START 'DO NOT MODIFY' SECTION------------------------------
 
-apply from: 'gradle/distributableGhidraModule.gradle'
-apply from: 'gradle/processorProject.gradle'
 apply plugin: 'eclipse'
 
 eclipse.project.name = 'Processors Alpha'
@@ -144,6 +142,8 @@ buildExtension {
     exclude 'gradle/**'
     exclude 'eclipse/**'
     exclude 'README.md'
+    exclude 'tests/**'
+    exclude '**/*.pdf'
 
     dependsOn(compileSleigh)
 }
