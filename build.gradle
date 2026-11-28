@@ -34,7 +34,7 @@
 
 apply plugin: 'eclipse'
 
-eclipse.project.name = 'Processors Alpha'
+eclipse.project.name = 'DEC Alpha Processors'
 
 def ghidraInstallDir
 def lib64installfolder = '/usr/lib64/ghidra'
