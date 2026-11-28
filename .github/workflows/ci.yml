@@ -25,7 +25,10 @@ jobs:
           auth_token: ${{ secrets.GITHUB_TOKEN }}
           version: ${{ matrix.ghidra }}
       - name: Build
-        run: ./gradlew test buildExtension -PGHIDRA_INSTALL_DIR=${{ env.GHIDRA_INSTALL_DIR }}
+        env:
+	  LANG: en_US.UTF-8
+        run: |
+	  ./gradlew test buildExtension --project-prop finalRelease=true -PGHIDRA_INSTALL_DIR=${{ env.GHIDRA_INSTALL_DIR }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: DEC_Alpha_Ghidra_${{ matrix.ghidra }}
