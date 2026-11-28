@@ -42,12 +42,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           pattern: DEC_Alpha_Ghidra_*
       - name: Upload distribution
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ github.ref_name }}" DEC_Alpha_Ghidra_*.zip
+          gh release upload "${{ github.ref_name }}" ghidra-alpha_Ghidra_*/*.zip
