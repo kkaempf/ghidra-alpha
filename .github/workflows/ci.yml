@@ -28,8 +28,8 @@ jobs:
         run: ./gradlew test buildExtension -PGHIDRA_INSTALL_DIR=${{ env.GHIDRA_INSTALL_DIR }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: Ghidra_DEC_Alpha_Ghidra_${{ matrix.ghidra }}
-          path: dist/*_DEC_Alpha.zip
+          name: DEC_Alpha_Ghidra_${{ matrix.ghidra }}
+          path: dist/*_ghidra-alpha.zip
           if-no-files-found: 'error'
   release:
     if: github.ref_type == 'tag'
@@ -42,9 +42,9 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v8
         with:
-          pattern: Ghidra_DEC_Alpha_Ghidra_*
+          pattern: DEC_Alpha_Ghidra_*
       - name: Upload distribution
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ github.ref_name }}" Ghidra_DEC_Alpha_Ghidra_*/*_Ghidra_DEC_Alpha.zip
+          gh release upload "${{ github.ref_name }}" DEC_Alpha_Ghidra_*/*_ghidra_alpha.zip
