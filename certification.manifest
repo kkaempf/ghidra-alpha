@@ -27,6 +27,9 @@ data/languages/21264NT.slaspec||LICENSE||||END|
 data/languages/21364NT.slaspec||LICENSE||||END|
 data/manuals/alpha_arch_ref.pdf||LICENSE||||END|
 data/manuals/alpha.idx||LICENSE||||END|
+extension.properties||LICENSE||||END|
+gradlew||LICENSE||||END|
+gradlew.bat||LICENSE||||END|
 tests/BNE.hex||LICENSE||||END|
 tests/PALgeneric.hex||LICENSE||||END|
 tests/PALcode.asmNT21064||LICENSE||||END|
