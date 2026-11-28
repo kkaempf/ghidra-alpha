@@ -1,10 +1,12 @@
 *~
 *.sla
 *.pdf
+.gradle
 core.*
 *.out
 *.outNT
 *.outUNIX
 *.outVMS
 /build/
+/dist/
 /lib/
