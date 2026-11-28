@@ -26,13 +26,13 @@ jobs:
           version: ${{ matrix.ghidra }}
       - name: Build
         env:
-	  LANG: en_US.UTF-8
+          LANG: en_US.UTF-8
         run: |
-	  ./gradlew test buildExtension --project-prop finalRelease=true -PGHIDRA_INSTALL_DIR=${{ env.GHIDRA_INSTALL_DIR }}
+          ./gradlew test buildExtension --project-prop finalRelease=true -PGHIDRA_INSTALL_DIR=${{ env.GHIDRA_INSTALL_DIR }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: DEC_Alpha_Ghidra_${{ matrix.ghidra }}
-          path: dist/*_ghidra-alpha.zip
+          path: dist/*.zip
           if-no-files-found: 'error'
   release:
     if: github.ref_type == 'tag'
