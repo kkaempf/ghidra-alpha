@@ -8,4 +8,5 @@ core.*
 *.outUNIX
 *.outVMS
 /build/
+/dist/
 /lib/
